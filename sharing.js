@@ -58,8 +58,45 @@ async function openStudentResult(index,resultId){
 function coachData(){model.coachStudents??=[];return model.coachStudents}
 function coachView(){const rows=coachData();modal('Mis alumnos',`<p class="muted">Seleccioná un alumno para enviarle una planificación. Cada alumno tiene su propio espacio de entrenamiento. Abrí sus resultados para verlos como ejercicios y progresar semanas sin mezclar tus datos.</p><div class="share-actions"><button class="button small primary" id="addCoachStudent">+ Alumno</button><button class="button small" id="resetCoachSelection">Mi entrenamiento</button></div><div id="coachRows">${rows.map((s,i)=>`<div class="share-box"><b>${escapeHtml(s.name)}</b> <small>${(s.received||[]).length} envíos recibidos</small><div class="share-actions"><button class="button small" data-coach-open="${i}">Ver resultados</button><button class="button small" data-coach-edit="${i}">Editar</button><button class="button small" data-coach-delete="${i}">Eliminar</button><button class="button small" data-coach-select="${i}">${model.coachActiveStudent===s.name?'✓ Seleccionado':'Seleccionar para planificar'}</button></div></div>`).join('')||'<p class="muted">Todavía no tenés alumnos.</p>'}</div>`)}
 function coachResults(index){const s=coachData()[index];if(!s)return;modal('Resultados · '+s.name,`<p class="muted">Tocá «Abrir en pantalla principal» para revisar todas las series y usar Progresar semana.</p><button class="button small" id="coachBack">← Mis alumnos</button>${(s.received||[]).slice().reverse().map(p=>`<div class="share-box"><b>${p.scope==='day'?'Entrenamiento':'Semana'} ${p.week}</b><small> · ${escapeHtml(p.created?.slice(0,10)||'')}</small><div class="share-actions"><button class="button small primary" data-open-result="${index}" data-result-id="${escapeHtml(p.id)}">Abrir en pantalla principal ↗</button></div>${p.days.map(d=>`<p><b>${escapeHtml(d.name)}</b></p>${d.exercises.map(e=>`<p>${escapeHtml(e.name)}: ${e.sets.map(x=>x.kg===null||x.reps===null?'pendiente':`${x.kg} kg × ${x.reps}${x.rir===null?'':' · RIR '+x.rir}`).join(' / ')}${e.notes?'<br>'+escapeHtml(e.notes):''}</p>`).join('')}`).join('')}</div>`).join('')||'<p>Sin resultados recibidos.</p>'}`)}
-function previewIncoming(p){shareValid(p);shareState.pending=p;modal('Vista previa de '+(p.type==='plan'?'planificación':'resultados'),`<div class="share-box"><b>${escapeHtml(p.student)}</b><p>${p.scope==='day'?'Entrenamiento':'Semana'} ${p.week} · ${p.days.length} día(s) · ${p.days.reduce((a,d)=>a+d.exercises.length,0)} ejercicio(s)</p></div><p class="muted">${p.type==='plan'?'Se agregará como una semana nueva en esta aplicación. No se sobrescriben tus entrenamientos.':'Los datos se guardarán en la ficha de este alumno, sin modificar tu rutina.'}</p><button class="button primary" id="acceptShare">Importar ${p.type==='plan'?'planificación':'resultados'}</button><button class="button small" id="discardShare">Cancelar</button>`)}
-async function acceptIncoming(){const p=shareState.pending;if(!p)return;shareValid(p);if(p.type==='results'){let s=coachData().find(x=>x.name.toLocaleLowerCase()===p.student.toLocaleLowerCase());if(!s){if(!confirm('No existe el alumno «'+p.student+'». ¿Crear su ficha?'))return;s={name:p.student,received:[]};model.coachStudents.push(s)}s.received??=[];if(s.received.some(x=>x.id===p.id)){alert('Este envío ya fue importado.');return}s.received.push(p);await persist();$('overlay').classList.remove('open');await openStudentResult(coachData().indexOf(s),p.id)}else{if(model.weeks.length>=500)throw Error('Máximo de semanas alcanzado');const next=Math.max(...model.weeks.map(w=>w.number))+1;const mapped=p.days.map((d,i)=>({number:i+1,name:d.name,exercises:d.exercises.map(e=>({id:uid(),exerciseId:e.exerciseId,name:e.name,plan:{...e.plan,sets:e.plan.sets.map(s=>({...s})),reason:'Planificación recibida'},sets:e.plan.sets.map(()=>({kg:null,reps:null,rir:null})),notes:'',updated:null}))}));if(!mapped.length)throw Error('La planificación no tiene días');model.weeks.push({number:next,kind:'normal',days:mapped});currentWeek=next;currentDay=1;await persist();$('overlay').classList.remove('open');render();alert('Planificación importada como Semana '+next)}shareState.pending=null;window.history.replaceState(null,'',location.pathname+location.search)}
+function previewIncoming(p){
+ shareValid(p);shareState.pending=p;
+ const results=p.type==='results';
+ const students=coachData();
+ const match=students.findIndex(x=>x.name.trim().toLocaleLowerCase()===p.student.trim().toLocaleLowerCase());
+ const assignment=results?`<div class="share-box"><label for="incomingStudent"><b>Asignar resultados a:</b></label><select id="incomingStudent" class="share-student-select"><option value="" ${match<0?'selected':''} disabled>Elegí un alumno existente</option>${students.map((s,i)=>`<option value="${i}" ${i===match?'selected':''}>${escapeHtml(s.name)}</option>`).join('')}<option value="new">+ Crear alumno nuevo…</option></select><p class="muted">El envío dice «${escapeHtml(p.student)}», pero vos elegís a qué ficha se incorpora. No se creará otro alumno automáticamente.</p></div>`:'';
+ modal('Vista previa de '+(results?'resultados':'planificación'),`<div class="share-box"><b>Remitente: ${escapeHtml(p.student)}</b><p>${p.scope==='day'?'Entrenamiento':'Semana'} ${p.week} · ${p.days.length} día(s) · ${p.days.reduce((a,d)=>a+d.exercises.length,0)} ejercicio(s)</p></div>${assignment}<p class="muted">${results?'Los resultados se guardarán en la ficha que selecciones y podrás abrirlos en la pantalla de entrenamiento.':'Se agregará como una semana nueva en esta aplicación. No se sobrescriben tus entrenamientos.'}</p><button class="button primary" id="acceptShare">Importar ${results?'resultados':'planificación'}</button><button class="button small" id="discardShare">Cancelar</button>`);
+}
+async function acceptIncoming(){
+ const p=shareState.pending;if(!p)return;shareValid(p);
+ if(p.type==='results'){
+  const selection=$('incomingStudent')?.value;
+  if(selection===undefined||selection===''){alert('Primero elegí a qué alumno corresponden los resultados.');return}
+  let s,idx;
+  if(selection==='new'){
+   const n=prompt('Nombre de la nueva ficha:',p.student)?.trim();
+   if(!n)return;
+   if(n.length>80||coachData().some(x=>x.name.trim().toLocaleLowerCase()===n.toLocaleLowerCase())){alert('Nombre inválido o ya existente. Seleccioná esa ficha en la lista.');return}
+   if(!confirm('¿Crear la ficha «'+n+'» e importar estos resultados allí?'))return;
+   s={name:n,received:[]};coachData().push(s);idx=coachData().length-1;
+  }else{
+   idx=Number(selection);
+   if(!Number.isInteger(idx)||idx<0||idx>=coachData().length)throw Error('Seleccioná un alumno válido');
+   s=coachData()[idx];
+   if(s.name.trim().toLocaleLowerCase()!==p.student.trim().toLocaleLowerCase() && !confirm('El enlace dice «'+p.student+'» pero vas a guardar los resultados en «'+s.name+'». ¿Confirmás?'))return;
+  }
+  if(coachData().some(x=>(x.received||[]).some(r=>r.id===p.id))){alert('Este envío ya fue importado en una ficha. No se importará dos veces.');return}
+  s.received??=[];s.received.push(p);
+  await persist();$('overlay').classList.remove('open');await openStudentResult(idx,p.id);
+ }else{
+  if(model.weeks.length>=500)throw Error('Máximo de semanas alcanzado');
+  const next=Math.max(...model.weeks.map(w=>w.number))+1;
+  const mapped=p.days.map((d,i)=>({number:i+1,name:d.name,exercises:d.exercises.map(e=>({id:uid(),exerciseId:e.exerciseId,name:e.name,plan:{...e.plan,sets:e.plan.sets.map(s=>({...s})),reason:'Planificación recibida'},sets:e.plan.sets.map(()=>({kg:null,reps:null,rir:null})),notes:'',updated:null}))}));
+  if(!mapped.length)throw Error('La planificación no tiene días');
+  model.weeks.push({number:next,kind:'normal',days:mapped});currentWeek=next;currentDay=1;
+  await persist();$('overlay').classList.remove('open');render();alert('Planificación importada como Semana '+next);
+ }
+ shareState.pending=null;window.history.replaceState(null,'',location.pathname+location.search);
+}
 $('shareToggle').onclick=()=>{const e=$('shareChoices');e.classList.toggle('hidden');$('shareToggle').setAttribute('aria-expanded',String(!e.classList.contains('hidden')))};
 $('shareTraining').onclick=()=>{$('shareChoices').classList.add('hidden');doShare('day')};$('shareWeek').onclick=()=>{$('shareChoices').classList.add('hidden');doShare('week')};$('coachPanel').onclick=()=>coachView();
 $('modalBody').addEventListener('click',async ev=>{const t=ev.target;try{if(t.id==='copyShareLink'){await navigator.clipboard.writeText(window._outShare.link);alert('Enlace copiado')}else if(t.id==='downloadShareFile'){const blob=new Blob([JSON.stringify(window._outShare.payload,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='Obsidiana-compartir.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1500)}else if(t.id==='addCoachStudent'){const n=prompt('Nombre del alumno:')?.trim();if(!n)return;if(n.length>80||coachData().some(x=>x.name.toLowerCase()===n.toLowerCase())){alert('Nombre inválido o repetido');return}coachData().push({name:n,received:[]});await persist();coachView()}else if(t.id==='resetCoachSelection'){await enterWorkspace('');coachView()}else if(t.dataset.coachEdit!==undefined){

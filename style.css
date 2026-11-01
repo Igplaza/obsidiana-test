@@ -129,3 +129,7 @@
  .workspace-bar{padding:9px 10px;font-size:11px;flex-wrap:wrap}
  .workspace-bar #workspaceBack{width:100%;text-align:center}
 }
+
+/* Importación de resultados: selector táctil visible en móvil */
+.share-student-select{display:block;box-sizing:border-box;width:100%;max-width:100%;margin:12px 0 6px;padding:12px 14px;color:var(--text,#f6eefb);background:#251b30;border:1px solid #795a91;border-radius:10px;font:inherit;min-height:46px}
+.share-student-select option{background:#251b30;color:#fff}
