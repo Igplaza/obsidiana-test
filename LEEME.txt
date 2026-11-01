@@ -1,14 +1,9 @@
-OBSIDIANA V3 - ENVÍO MANUAL POR ENLACE (PROTOTIPO)
+OBSIDIANA V3 · Prueba entrenador/alumno
 
-1. Abrí esta carpeta en VS Code y ejecutá index.html con Live Server.
-2. «Enviar ▾» > Entrenamiento / Semana genera un enlace. Por defecto envía resultados personales; si seleccionaste un alumno desde «Mis alumnos», envía la planificación de la semana o día actual.
-3. «Mis alumnos» permite crear fichas, seleccionar destinatario y revisar resultados importados.
-4. Al abrir un enlace se muestra vista previa y se necesita pulsar «Importar».
-5. El enlace incluye datos codificados, NO cifrados. Compartilo solo con quien corresponda; no incluyas datos sensibles.
-6. Los enlaces de localhost solo funcionan en el mismo equipo: para enviarlos a otro celular, publicar este proyecto en un dominio HTTPS accesible a ambos. El sistema NO sincroniza automáticamente.
-7. Enlaces largos pueden fallar en mensajería. Se ofrece descargar un JSON alternativo; no hay importación automática del archivo de intercambio en este prototipo.
-8. Esta es una versión de prueba: antes de usar datos reales, verificá el flujo en dos navegadores independientes y exportá respaldos.
-9. Cada planificación entrante se agrega como una semana nueva, no sobrescribe la actual. Los resultados recibidos se almacenan en la ficha del alumno de este dispositivo.
-
-10. Mis alumnos: Editar cambia el nombre de la ficha; Eliminar borra la ficha y resultados (doble confirmación).
-11. Si renombrás un alumno, los enlaces de resultados enviados previamente podrían referirse al nombre anterior; avisale para evitar duplicados.
+1. Subí los archivos a tu repositorio reemplazando los anteriores.
+2. Hacé respaldo desde la versión publicada antes de actualizar.
+3. Mis alumnos -> Ver resultados -> Abrir en pantalla principal.
+4. Cada alumno tiene semanas separadas, y el botón Volver a mi entrenamiento restaura las semanas personales.
+5. Entrenador en el espacio del alumno: Progresar semana, modificar objetivos y compartir planificación.
+6. Los datos se guardan localmente en ese navegador, sin nube.
+7. Probá únicamente con datos ficticios: enlaces sin cifrar.

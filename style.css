@@ -63,3 +63,69 @@
 
 /* Compartir rutinas y resultados */
 .share-menu{position:relative;display:inline-flex}.share-choices{position:absolute;top:calc(100% + 5px);right:0;z-index:14;min-width:185px;padding:7px;border:1px solid #ffffff29;border-radius:12px;background:#241b31;box-shadow:0 10px 28px #0008}.share-choices .button{display:block;width:100%;margin:3px 0;text-align:left}.share-box{padding:12px;border-radius:12px;border:1px solid #ffffff24;margin:10px 0;background:#251b30}.share-box p{overflow-wrap:anywhere}.share-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.share-input{width:100%;padding:11px;border-radius:9px;background:#0e0a17;color:#fff;border:1px solid #ffffff35}.share-warning{font-size:12px;color:#e2bd78}
+
+/* Diseño mobile: muestra primero lo necesario para entrenar. */
+.mobile-main-controls{display:contents}
+.mobile-options,.mobile-day-options{display:none}
+@media(max-width:760px){
+ .top{padding:12px 16px}
+ .brand{font-size:12px;letter-spacing:.13em}
+ .brand small{font-size:8px}
+ .pill{font-size:9px;padding:7px 9px;white-space:nowrap}
+ .wrap{padding:12px 14px 88px}
+ .hero{padding:12px 16px;border-radius:13px;min-height:90px}
+ .hero h1{font-size:22px;line-height:1.1;margin:4px 0}
+ .hero .eyebrow{font-size:9px}
+ .hero .sub{display:none}
+ .weeknum{font-size:37px;line-height:1}
+ .toolbar{display:flex;margin:12px 0 16px;gap:8px;align-items:stretch}
+ .toolbar>.spacer{display:none}
+ .mobile-main-controls{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:8px;width:100%}
+ .mobile-main-controls select,.mobile-main-controls .button{width:100%;min-width:0;max-width:none;min-height:44px;padding:9px 10px;font-size:13px}
+ .mobile-options{display:block;width:100%}
+ .mobile-options>summary,.mobile-day-options>summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-height:38px;padding:8px 12px;background:#241b30;border:1px solid #ffffff28;border-radius:10px;font-size:12px;cursor:pointer}
+ .mobile-options>summary::-webkit-details-marker,.mobile-day-options>summary::-webkit-details-marker{display:none}
+ .mobile-options[open]>summary,.mobile-day-options[open]>summary{border-color:#b88be5a0}
+ .mobile-options-content,.mobile-day-options-content{padding:10px 0 2px;display:flex;gap:7px;flex-wrap:wrap;align-items:flex-start}
+ .mobile-options-content>.button,.mobile-options-content>.share-menu>.button{min-height:38px}
+ .mobile-options-content>.share-menu{display:inline-flex}
+ .share-choices{z-index:20}
+ .daytools{margin:4px 0 9px;align-items:center;gap:6px}
+ .daytools-label{width:auto!important;font-size:10px}
+ .daytools>.row{width:100%;display:flex;gap:7px;align-items:center}
+ .daytools #addDay{min-height:37px}
+ .mobile-day-options{display:block;flex:1;min-width:0}
+ .mobile-day-options>summary{min-height:37px}
+ .mobile-day-options-content{padding-top:8px}
+ .days{gap:6px;padding-bottom:8px;scrollbar-width:thin}
+ .day{min-width:83px;flex:0 0 auto;padding:10px 8px}
+ .day b{font-size:12px}
+ .day small{font-size:10px}
+ .section-head{margin:11px 0}
+ .section-head h2{font-size:20px}
+ .mobiletimer{padding:7px 12px max(7px,env(safe-area-inset-bottom));gap:8px}
+ .mobiletimer .eyebrow{font-size:9px;letter-spacing:.08em}
+ .mobiletimer b{font-size:21px}
+ .mobiletimer .button{min-height:36px;padding:7px 10px;font-size:12px}
+}
+@media(max-width:375px){.hero h1{font-size:20px}.pill{font-size:8px}.mobile-main-controls .button{font-size:11px}.brand{font-size:11px}}
+
+/* Vista entrenador, espacio activo y lectura cómoda de los resultados */
+.workspace-bar{display:flex;justify-content:space-between;gap:12px;align-items:center;margin:14px 0 0;padding:10px 13px;background:#20192a;border:1px solid #ffffff20;border-radius:12px;font-size:12px;color:#d7c1f3;font-weight:650}
+.workspace-bar.coach-active{background:#302045;border-color:#bd91f57f}
+.workspace-bar #workspaceBack{flex-shrink:0}
+.workspace-bar [hidden]{display:none!important}
+.share-box{max-width:100%;overflow-wrap:anywhere;line-height:1.5}
+.share-box p{font-size:13px;line-height:1.55;margin:8px 0}
+.share-box b{line-height:1.5}
+@media(max-width:760px){
+ .overlay{padding:8px;align-items:center}
+ .modal{width:100%;max-width:540px;max-height:min(84dvh,830px);padding:15px 13px;border-radius:14px;overflow-x:hidden}
+ .modal h3{font-size:18px;line-height:1.3}
+ .share-box{padding:11px;margin:10px 0}
+ .share-box p{font-size:12px}
+ .share-actions{gap:6px}
+ .share-actions .button{white-space:normal;text-align:center;max-width:100%;min-height:38px}
+ .workspace-bar{padding:9px 10px;font-size:11px;flex-wrap:wrap}
+ .workspace-bar #workspaceBack{width:100%;text-align:center}
+}
