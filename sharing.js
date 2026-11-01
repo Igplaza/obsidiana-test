@@ -95,7 +95,7 @@ async function acceptIncoming(){
   model.weeks.push({number:next,kind:'normal',days:mapped});currentWeek=next;currentDay=1;
   await persist();$('overlay').classList.remove('open');render();alert('Planificación importada como Semana '+next);
  }
- shareState.pending=null;window.history.replaceState(null,'',location.pathname+location.search);
+ shareState.pending=null;globalThis.history.replaceState(null,'',location.pathname+location.search);
 }
 $('shareToggle').onclick=()=>{const e=$('shareChoices');e.classList.toggle('hidden');$('shareToggle').setAttribute('aria-expanded',String(!e.classList.contains('hidden')))};
 $('shareTraining').onclick=()=>{$('shareChoices').classList.add('hidden');doShare('day')};$('shareWeek').onclick=()=>{$('shareChoices').classList.add('hidden');doShare('week')};$('coachPanel').onclick=()=>coachView();
@@ -120,7 +120,7 @@ $('modalBody').addEventListener('click',async ev=>{const t=ev.target;try{if(t.id
   if(model.coachActiveStudent===s.name)model.coachActiveStudent='';
   if(model.coachWorkspaces)delete model.coachWorkspaces[s.name];
   await persist();coachView();
-}else if(t.dataset.coachSelect!==undefined){await enterWorkspace(coachData()[Number(t.dataset.coachSelect)].name);coachView()}else if(t.dataset.coachOpen!==undefined){coachResults(Number(t.dataset.coachOpen))}else if(t.dataset.openResult!==undefined){await openStudentResult(Number(t.dataset.openResult),t.dataset.resultId)}else if(t.id==='coachBack'){coachView()}else if(t.id==='acceptShare'){await acceptIncoming()}else if(t.id==='discardShare'){shareState.pending=null;$('overlay').classList.remove('open');window.history.replaceState(null,'',location.pathname+location.search)}}catch(e){alert('No se pudo completar: '+e.message)}});
+}else if(t.dataset.coachSelect!==undefined){await enterWorkspace(coachData()[Number(t.dataset.coachSelect)].name);coachView()}else if(t.dataset.coachOpen!==undefined){coachResults(Number(t.dataset.coachOpen))}else if(t.dataset.openResult!==undefined){await openStudentResult(Number(t.dataset.openResult),t.dataset.resultId)}else if(t.id==='coachBack'){coachView()}else if(t.id==='acceptShare'){await acceptIncoming()}else if(t.id==='discardShare'){shareState.pending=null;$('overlay').classList.remove('open');globalThis.history.replaceState(null,'',location.pathname+location.search)}}catch(e){alert('No se pudo completar: '+e.message)}});
 window.addEventListener('load',()=>{if(location.hash.startsWith('#obs-share=')){try{previewIncoming(shareDecode(location.hash.slice('#obs-share='.length)))}catch(e){alert('No se pudo abrir el enlace: '+e.message)}}});
 
 $('workspaceBack').addEventListener('click',()=>enterWorkspace(''));
