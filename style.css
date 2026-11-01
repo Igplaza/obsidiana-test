@@ -133,3 +133,24 @@
 /* Importación de resultados: selector táctil visible en móvil */
 .share-student-select{display:block;box-sizing:border-box;width:100%;max-width:100%;margin:12px 0 6px;padding:12px 14px;color:var(--text,#f6eefb);background:#251b30;border:1px solid #795a91;border-radius:10px;font:inherit;min-height:46px}
 .share-student-select option{background:#251b30;color:#fff}
+
+/* Obsidiana · portales de alumno y entrenador */
+.portal-intro{background:linear-gradient(135deg,#342044,#201829);padding:17px;border:1px solid #b68be54a;border-radius:16px;margin:10px 0 18px}
+.portal-intro p{line-height:1.55;color:#d9cde5;font-size:13px;margin:10px 0 14px}
+.portal-tag{display:inline-block;color:#d9a8ff;letter-spacing:.12em;font-size:10px;font-weight:800}
+.portal-actions{display:flex;flex-wrap:wrap;gap:8px}
+.student-grid{display:grid;gap:10px}
+.student-tile{display:flex;gap:13px;background:#261b31;padding:14px;border:1px solid #ffffff21;border-radius:14px;min-width:0}
+.student-tile.selected{border-color:#ba8be9}
+.student-avatar{flex:0 0 42px;width:42px;height:42px;display:flex;justify-content:center;align-items:center;border-radius:12px;background:#794b9e;color:#fff;font-weight:800;font-size:20px}
+.student-tile-main{flex:1;min-width:0}.student-tile-top{display:flex;gap:9px;align-items:center;flex-wrap:wrap}.student-tile-top b{font-size:16px}
+.student-tile-main>small{display:block;color:#bfaecc;margin:5px 0 12px}.student-chip{font-size:10px;color:#e0c6ff;border:1px solid #9f76cc;border-radius:20px;padding:3px 8px}
+.student-tile-actions{display:flex;flex-wrap:wrap;gap:7px}.student-tile-actions .button{min-height:35px}
+.result-card{padding:14px;background:#271d32;border:1px solid #ffffff26;border-radius:15px;margin:12px 0}
+.result-card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.result-card-head small{display:block;margin:4px 0;color:#baaccc}.result-days{margin-top:12px;display:grid;gap:11px}
+.result-day{background:#1b1423;padding:12px;border-radius:10px}.result-day>strong{display:block;color:#dfb6ff;margin-bottom:8px}
+.result-exercise{padding:8px 0;border-top:1px solid #ffffff19}.result-exercise b{display:block;font-size:13px}.result-exercise small{display:block;color:#bfb0cc;font-size:12px;line-height:1.55;margin-top:3px;overflow-wrap:anywhere}
+.portal-empty{border:1px dashed #ffffff3d;border-radius:12px;padding:22px;text-align:center;color:#c9bbd7}
+.incoming-title{font-size:22px;font-weight:800;margin:8px 0 12px;overflow-wrap:anywhere}.incoming-facts{display:flex;flex-wrap:wrap;gap:6px}.incoming-facts span{border-radius:30px;background:#ffffff18;padding:6px 9px;font-size:11px}
+@media(max-width:760px){.portal-intro{padding:13px}.student-tile{padding:11px;gap:9px}.student-avatar{flex-basis:37px;width:37px;height:37px}.student-tile-actions{display:grid;grid-template-columns:1fr 1fr}.student-tile-actions .button{font-size:11px;padding:8px 5px;white-space:normal}.result-card{padding:10px}.result-card-head .button{width:100%}.incoming-title{font-size:19px}}

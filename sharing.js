@@ -55,16 +55,32 @@ async function openStudentResult(index,resultId){
  await persist();$('overlay').classList.remove('open');render();updateWorkspaceBar();
  window.scrollTo({top:0,behavior:'smooth'});
 }
-function coachData(){model.coachStudents??=[];return model.coachStudents}
-function coachView(){const rows=coachData();modal('Mis alumnos',`<p class="muted">Seleccioná un alumno para enviarle una planificación. Cada alumno tiene su propio espacio de entrenamiento. Abrí sus resultados para verlos como ejercicios y progresar semanas sin mezclar tus datos.</p><div class="share-actions"><button class="button small primary" id="addCoachStudent">+ Alumno</button><button class="button small" id="resetCoachSelection">Mi entrenamiento</button></div><div id="coachRows">${rows.map((s,i)=>`<div class="share-box"><b>${escapeHtml(s.name)}</b> <small>${(s.received||[]).length} envíos recibidos</small><div class="share-actions"><button class="button small" data-coach-open="${i}">Ver resultados</button><button class="button small" data-coach-edit="${i}">Editar</button><button class="button small" data-coach-delete="${i}">Eliminar</button><button class="button small" data-coach-select="${i}">${model.coachActiveStudent===s.name?'✓ Seleccionado':'Seleccionar para planificar'}</button></div></div>`).join('')||'<p class="muted">Todavía no tenés alumnos.</p>'}</div>`)}
-function coachResults(index){const s=coachData()[index];if(!s)return;modal('Resultados · '+s.name,`<p class="muted">Tocá «Abrir en pantalla principal» para revisar todas las series y usar Progresar semana.</p><button class="button small" id="coachBack">← Mis alumnos</button>${(s.received||[]).slice().reverse().map(p=>`<div class="share-box"><b>${p.scope==='day'?'Entrenamiento':'Semana'} ${p.week}</b><small> · ${escapeHtml(p.created?.slice(0,10)||'')}</small><div class="share-actions"><button class="button small primary" data-open-result="${index}" data-result-id="${escapeHtml(p.id)}">Abrir en pantalla principal ↗</button></div>${p.days.map(d=>`<p><b>${escapeHtml(d.name)}</b></p>${d.exercises.map(e=>`<p>${escapeHtml(e.name)}: ${e.sets.map(x=>x.kg===null||x.reps===null?'pendiente':`${x.kg} kg × ${x.reps}${x.rir===null?'':' · RIR '+x.rir}`).join(' / ')}${e.notes?'<br>'+escapeHtml(e.notes):''}</p>`).join('')}`).join('')}</div>`).join('')||'<p>Sin resultados recibidos.</p>'}`)}
+function coachData(){if(!model)throw Error('Los datos locales todavía no terminaron de cargar. Reintentá en unos segundos.');model.coachStudents??=[];return model.coachStudents}
+function coachView(){
+ const rows=coachData();
+ const content=rows.map((s,i)=>{
+  const n=(s.received||[]).length;
+  const active=model.coachActiveStudent===s.name;
+  return `<section class="student-tile ${active?'selected':''}">
+    <div class="student-avatar">${escapeHtml(s.name.slice(0,1).toUpperCase())}</div>
+    <div class="student-tile-main"><div class="student-tile-top"><b>${escapeHtml(s.name)}</b>${active?'<span class="student-chip">Activo</span>':''}</div><small>${n} ${n===1?'envío recibido':'envíos recibidos'}</small>
+    <div class="student-tile-actions"><button class="button small primary" data-coach-open="${i}">Ver resultados</button><button class="button small" data-coach-select="${i}">Abrir rutina</button><button class="button small" data-coach-edit="${i}">Editar</button><button class="button small danger" data-coach-delete="${i}">Eliminar</button></div></div>
+  </section>`}).join('');
+ modal('Mis alumnos',`<div class="portal-intro"><span class="portal-tag">ESPACIO ENTRENADOR</span><p>Administrá cada alumno por separado. Abrí sus resultados en la pantalla principal para revisar sus series y progresar su planificación.</p><div class="portal-actions"><button class="button small primary" id="addCoachStudent">+ Agregar alumno</button><button class="button small" id="resetCoachSelection">Mi entrenamiento</button></div></div><div class="student-grid">${content||'<div class="portal-empty">Todavía no tenés alumnos. Creá el primero para empezar.</div>'}</div>`);
+}
+function coachResults(index){
+ const s=coachData()[index];if(!s)return;
+ const content=(s.received||[]).slice().reverse().map(p=>`<article class="result-card"><div class="result-card-head"><div><b>${p.scope==='day'?'Entrenamiento':'Semana'} ${escapeHtml(p.week)}</b><small>${escapeHtml(p.created?.slice(0,10)||'')}</small></div><button class="button small primary" data-open-result="${index}" data-result-id="${escapeHtml(p.id)}">Abrir rutina ↗</button></div><div class="result-days">${p.days.map(d=>`<section class="result-day"><strong>${escapeHtml(d.name)}</strong>${d.exercises.map(e=>`<div class="result-exercise"><b>${escapeHtml(e.name)}</b><small>${e.sets.map(x=>x.kg===null||x.reps===null?'Pendiente':`${escapeHtml(x.kg)} kg × ${escapeHtml(x.reps)}${x.rir===null?'':' · RIR '+escapeHtml(x.rir)}`).join(' · ')}</small>${e.notes?`<small>Nota: ${escapeHtml(e.notes)}</small>`:''}</div>`).join('')}</section>`).join('')}</div></article>`).join('');
+ modal('Resultados · '+s.name,`<div class="portal-intro"><span class="portal-tag">SEGUIMIENTO DEL ALUMNO</span><p>Los envíos recibidos se guardan en esta ficha. Abrí uno para trabajar con sus ejercicios y progresar la semana.</p><button class="button small" id="coachBack">← Mis alumnos</button></div>${content||'<div class="portal-empty">Todavía no recibiste resultados de este alumno.</div>'}`);
+}
+
 function previewIncoming(p){
  shareValid(p);shareState.pending=p;
  const results=p.type==='results';
  const students=coachData();
  const match=students.findIndex(x=>x.name.trim().toLocaleLowerCase()===p.student.trim().toLocaleLowerCase());
  const assignment=results?`<div class="share-box"><label for="incomingStudent"><b>Asignar resultados a:</b></label><select id="incomingStudent" class="share-student-select"><option value="" ${match<0?'selected':''} disabled>Elegí un alumno existente</option>${students.map((s,i)=>`<option value="${i}" ${i===match?'selected':''}>${escapeHtml(s.name)}</option>`).join('')}<option value="new">+ Crear alumno nuevo…</option></select><p class="muted">El envío dice «${escapeHtml(p.student)}», pero vos elegís a qué ficha se incorpora. No se creará otro alumno automáticamente.</p></div>`:'';
- modal('Vista previa de '+(results?'resultados':'planificación'),`<div class="share-box"><b>Remitente: ${escapeHtml(p.student)}</b><p>${p.scope==='day'?'Entrenamiento':'Semana'} ${p.week} · ${p.days.length} día(s) · ${p.days.reduce((a,d)=>a+d.exercises.length,0)} ejercicio(s)</p></div>${assignment}<p class="muted">${results?'Los resultados se guardarán en la ficha que selecciones y podrás abrirlos en la pantalla de entrenamiento.':'Se agregará como una semana nueva en esta aplicación. No se sobrescriben tus entrenamientos.'}</p><button class="button primary" id="acceptShare">Importar ${results?'resultados':'planificación'}</button><button class="button small" id="discardShare">Cancelar</button>`);
+ modal('Vista previa de '+(results?'resultados':'planificación'),`<div class="portal-intro"><span class="portal-tag">${results?'RESULTADOS RECIBIDOS':'PLANIFICACIÓN RECIBIDA'}</span><div class="incoming-title">${escapeHtml(p.student)}</div><div class="incoming-facts"><span>${p.scope==='day'?'Entrenamiento':'Semana'} ${escapeHtml(p.week)}</span><span>${p.days.length} día(s)</span><span>${p.days.reduce((a,d)=>a+d.exercises.length,0)} ejercicio(s)</span></div></div>${assignment}<p class="muted">${results?'Los resultados se guardarán en la ficha que selecciones y podrás abrirlos en la pantalla de entrenamiento.':'Se agregará como una semana nueva en esta aplicación. No se sobrescriben tus entrenamientos.'}</p><button class="button primary" id="acceptShare">Importar ${results?'resultados':'planificación'}</button><button class="button small" id="discardShare">Cancelar</button>`);
 }
 async function acceptIncoming(){
  const p=shareState.pending;if(!p)return;shareValid(p);
@@ -121,7 +137,14 @@ $('modalBody').addEventListener('click',async ev=>{const t=ev.target;try{if(t.id
   if(model.coachWorkspaces)delete model.coachWorkspaces[s.name];
   await persist();coachView();
 }else if(t.dataset.coachSelect!==undefined){await enterWorkspace(coachData()[Number(t.dataset.coachSelect)].name);coachView()}else if(t.dataset.coachOpen!==undefined){coachResults(Number(t.dataset.coachOpen))}else if(t.dataset.openResult!==undefined){await openStudentResult(Number(t.dataset.openResult),t.dataset.resultId)}else if(t.id==='coachBack'){coachView()}else if(t.id==='acceptShare'){await acceptIncoming()}else if(t.id==='discardShare'){shareState.pending=null;$('overlay').classList.remove('open');globalThis.history.replaceState(null,'',location.pathname+location.search)}}catch(e){alert('No se pudo completar: '+e.message)}});
-window.addEventListener('load',()=>{if(location.hash.startsWith('#obs-share=')){try{previewIncoming(shareDecode(location.hash.slice('#obs-share='.length)))}catch(e){alert('No se pudo abrir el enlace: '+e.message)}}});
+window.addEventListener('load',async()=>{
+ if(!location.hash.startsWith('#obs-share='))return;
+ try{
+  const ready=await window.obsidianaReady;
+  if(!ready)throw Error('No se pudo abrir el almacenamiento local. Revisá que el navegador permita guardar datos para esta página.');
+  previewIncoming(shareDecode(location.hash.slice('#obs-share='.length)));
+ }catch(e){alert('No se pudo abrir el enlace: '+e.message)}
+});
 
 $('workspaceBack').addEventListener('click',()=>enterWorkspace(''));
 window.addEventListener('load',()=>setTimeout(updateWorkspaceBar,200));
