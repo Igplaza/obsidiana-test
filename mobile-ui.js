@@ -1,39 +1,49 @@
-/* Presentación compacta para pantallas pequeñas.
-   Reubica los mismos botones, conservando IDs y sus eventos. */
+/* Interfaz móvil compacta: conserva los mismos nodos/IDs y listeners. */
 (function(){
   if (!window.matchMedia('(max-width:760px)').matches) return;
   const toolbar=document.querySelector('.toolbar');
   const daytools=document.querySelector('.daytools');
-  if(!toolbar || !daytools) return;
+  if(!toolbar||!daytools) return;
   const week=document.getElementById('week');
-  const progress=document.getElementById('autoWeek');
-  const controls=document.createElement('div');
-  controls.className='mobile-main-controls';
-  toolbar.insertBefore(controls,toolbar.firstChild);
-  controls.append(week,progress);
+  const addExercise=document.getElementById('addExercise');
+  const primary=document.createElement('div');
+  primary.className='mobile-compact-primary';
+  toolbar.prepend(primary);
+  const selectLabel=document.createElement('label');
+  selectLabel.className='mobile-week-select';
+  selectLabel.innerHTML='<span>SEMANA</span>';
+  selectLabel.append(week);
+  primary.append(selectLabel);
 
   const details=document.createElement('details');
-  details.className='mobile-options';
-  details.innerHTML='<summary class="button small">Opciones <span aria-hidden="true">▾</span></summary><div class="mobile-options-content"></div>';
-  toolbar.append(details);
-  const options=details.querySelector('.mobile-options-content');
-  ['addWeek','deloadWeek','shareToggle','coachPanel','evolution','export','import'].forEach(id=>{
-    const el=document.getElementById(id);
-    if(!el) return;
-    options.append(id==='shareToggle'?el.closest('.share-menu'):el);
-  });
-  const file=document.getElementById('importFile'); if(file) options.append(file);
-
-  const dayRow=daytools.querySelector('.row');
-  const dayDetails=document.createElement('details');
-  dayDetails.className='mobile-day-options';
-  dayDetails.innerHTML='<summary class="button small">Editar días <span aria-hidden="true">▾</span></summary><div class="mobile-day-options-content"></div>';
-  if(dayRow){
-    dayRow.append(dayDetails);
-    const dcontent=dayDetails.querySelector('.mobile-day-options-content');
-    ['renameDay','moveDayUp','moveDayDown','deleteMenuToggle'].forEach(id=>{
+  details.className='mobile-compact-menu';
+  details.innerHTML='<summary aria-label="Abrir herramientas">☰ <span>Menú</span></summary><div class="mobile-compact-panel"></div>';
+  primary.append(details);
+  const panel=details.querySelector('.mobile-compact-panel');
+  const groups=[
+    ['Planificación',['autoWeek','addWeek','deloadWeek']],
+    ['Compartir y alumnos',['shareToggle','coachPanel']],
+    ['Seguimiento y datos',['evolution','export','import']],
+    ['Organizar días',['addDay','renameDay','moveDayUp','moveDayDown','deleteMenuToggle']]
+  ];
+  groups.forEach(([title,ids])=>{
+    const group=document.createElement('section');
+    group.className='mobile-compact-group';
+    const heading=document.createElement('b');heading.textContent=title;group.append(heading);
+    ids.forEach(id=>{
       const el=document.getElementById(id);
-      if(el) dcontent.append(id==='deleteMenuToggle'?el.closest('.delete-menu'):el);
+      if(!el) return;
+      const parent=(id==='shareToggle'||id==='deleteMenuToggle')?el.parentElement:el;
+      if(parent) group.append(parent);
     });
-  }
+    panel.append(group);
+  });
+  const file=document.getElementById('importFile');if(file)panel.append(file);
+  // Conservamos el elemento «daytools» sin sus controles para ahorrar espacio.
+  daytools.classList.add('mobile-daytools-hidden');
+  // Los eventos existentes se conservan al trasladar los elementos.
+  document.addEventListener('click',e=>{
+    if(!details.open||details.contains(e.target))return;
+    details.open=false;
+  });
 })();

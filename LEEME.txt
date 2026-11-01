@@ -1,1 +1,10 @@
-Obsidiana V3 — corrección importación y portales\n\nCambios: compartir/importar enlaces espera carga de IndexedDB; error claro si falla; portal Mis alumnos y resultados renovado para móvil.\n\nIMPORTANTE: antes de actualizar hacé respaldo. Para evitar archivos mezclados, reemplazá TODOS los archivos del repositorio con estos archivos. Conservá misma URL. No vuelvas a importar envíos duplicados.\n\nVerificar con 2 dispositivos y datos de prueba.\n
+OBSIDIANA V3 · MOBILE + DARK
+
+Incluye todas las funciones del paquete V3 Mobile simplificada y una nueva paleta grafito/carbón con acento amatista.
+
+1. Hacé respaldo de tus datos desde la app publicada.
+2. Subí TODOS los archivos de esta carpeta a la RAÍZ de tu repositorio GitHub Pages (no el ZIP).
+3. Confirmá el commit y esperá el despliegue.
+4. Recargá la página en tu teléfono.
+
+Esta actualización modifica solamente CSS, metadatos y números de versión de recursos; no cambia las funciones JavaScript de entrenamiento, alumnos o importación.
