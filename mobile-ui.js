@@ -22,7 +22,7 @@
   const panel=details.querySelector('.mobile-compact-panel');
   const groups=[
     ['Planificación',['autoWeek','addWeek','deloadWeek']],
-    ['Compartir y alumnos',['shareToggle','coachPanel']],
+    ['Compartir y alumnos',['shareToggle','coachPanel','studentLink']],
     ['Seguimiento y datos',['evolution','export','import']],
     ['Organizar días',['addDay','renameDay','moveDayUp','moveDayDown','deleteMenuToggle']]
   ];
@@ -41,6 +41,14 @@
   const file=document.getElementById('importFile');if(file)panel.append(file);
   // Conservamos el elemento «daytools» sin sus controles para ahorrar espacio.
   daytools.classList.add('mobile-daytools-hidden');
+  // Al pulsar una herramienta, cerrar el menú antes de mostrar su diálogo.
+  // Las herramientas con submenú (Enviar / Eliminar) quedan abiertas para elegir.
+  details.addEventListener('click',e=>{
+    const button=e.target.closest('button');
+    if(!button || !details.contains(button))return;
+    if(button.id==='shareToggle' || button.id==='deleteMenuToggle')return;
+    details.open=false;
+  });
   // Los eventos existentes se conservan al trasladar los elementos.
   document.addEventListener('click',e=>{
     if(!details.open||details.contains(e.target))return;

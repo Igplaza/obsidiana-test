@@ -9,19 +9,19 @@ function shareDays(scope,type){const w=week(),ds=scope==='day'?[day()]:w.days;re
 function showShareLink(payload){shareValid(payload);const link=location.origin+location.pathname+'#obs-share='+shareEncode(payload);const tooLong=link.length>12000;modal('Enviar · '+(payload.type==='plan'?'Planificación':'Resultados'),`<p>Copiá el enlace y envialo por WhatsApp. La otra persona deberá abrirlo con Obsidiana.</p><input class="share-input" id="outShareLink" readonly value="${escapeHtml(link)}"><div class="share-actions"><button class="button primary small" id="copyShareLink">Copiar enlace</button><button class="button small" id="downloadShareFile">Descargar archivo alternativo</button></div><p class="share-warning">${tooLong?'El enlace es largo y podría fallar. Para este caso conviene compartir el archivo alternativo.':'Importación con vista previa y confirmación.'}</p><p class="muted">El enlace contiene datos legibles para quien lo reciba. No incluyas información privada o médica.</p>`);window._outShare={link,payload};}
 async function doShare(scope){if(!guardDirty())return;const student=shareStudent();if(!student)return;const selected=activeWorkspace();const isTrainer=!!selected;const type=isTrainer?'plan':'results';const studentName=isTrainer?selected:student;const obj={app:'obsidiana',v:1,type,scope,student:studentName,week:currentWeek,from:student,created:new Date().toISOString(),days:shareDays(scope,type),id:uid()};showShareLink(obj)}
 // Espacios separados: los entrenamientos personales nunca se mezclan con los de un alumno.
-function studentWorkspace(name){model.coachWorkspaces??={};return model.coachWorkspaces[name]??={weeks:[{number:1,kind:'normal',days:[{number:1,name:'Día 1',exercises:[]}]}],week:1};}
+function studentWorkspace(name){model.coachWorkspaces??={};return model.coachWorkspaces[name]??={weeks:[{number:1,kind:'normal',days:[{number:1,name:'Día 1',exercises:[]}]}],week:1,effortScale:'rir'};}
 function activeWorkspace(){return model.coachWorkspaceActive||'';}
 function rememberWorkspace(){
  const active=activeWorkspace();
- if(active){model.coachWorkspaces??={};model.coachWorkspaces[active]={weeks:model.weeks,week:currentWeek};}
- else model.personalWorkspace={weeks:model.weeks,week:currentWeek};
+ if(active){model.coachWorkspaces??={};model.coachWorkspaces[active]={weeks:model.weeks,week:currentWeek,effortScale:model.effortScale||'rir'};}
+ else model.personalWorkspace={weeks:model.weeks,week:currentWeek,effortScale:model.effortScale||'rir'};
 }
 async function enterWorkspace(name){
  if(!guardDirty())return false;
  if(name && !coachData().some(s=>s.name===name)){alert('No se encontró el alumno');return false;}
  rememberWorkspace();
- if(name){const ws=studentWorkspace(name);model.weeks=ws.weeks;currentWeek=ws.week;model.coachWorkspaceActive=name;}
- else{const ws=model.personalWorkspace||{weeks:model.weeks,week:currentWeek};model.weeks=ws.weeks;currentWeek=ws.week;model.coachWorkspaceActive='';}
+ if(name){const ws=studentWorkspace(name);model.weeks=ws.weeks;currentWeek=ws.week;model.effortScale=ws.effortScale||'rir';model.coachWorkspaceActive=name;}
+ else{const ws=model.personalWorkspace||{weeks:model.weeks,week:currentWeek};model.weeks=ws.weeks;currentWeek=ws.week;model.effortScale=ws.effortScale||'rir';model.coachWorkspaceActive='';}
  if(!model.weeks.some(w=>w.number===currentWeek))currentWeek=model.weeks[0].number;
  currentDay=model.weeks.find(w=>w.number===currentWeek).days[0].number;
  model.coachActiveStudent=name;
@@ -66,7 +66,7 @@ function coachView(){
     <div class="student-tile-main"><div class="student-tile-top"><b>${escapeHtml(s.name)}</b>${active?'<span class="student-chip">Activo</span>':''}</div><small>${n} ${n===1?'envío recibido':'envíos recibidos'}</small>
     <div class="student-tile-actions"><button class="button small primary" data-coach-open="${i}">Ver resultados</button><button class="button small" data-coach-select="${i}">Abrir rutina</button><button class="button small" data-coach-edit="${i}">Editar</button><button class="button small danger" data-coach-delete="${i}">Eliminar</button></div></div>
   </section>`}).join('');
- modal('Mis alumnos',`<div class="portal-intro"><span class="portal-tag">ESPACIO ENTRENADOR</span><p>Administrá cada alumno por separado. Abrí sus resultados en la pantalla principal para revisar sus series y progresar su planificación.</p><div class="portal-actions"><button class="button small primary" id="addCoachStudent">+ Agregar alumno</button><button class="button small" id="resetCoachSelection">Mi entrenamiento</button></div></div><div class="student-grid">${content||'<div class="portal-empty">Todavía no tenés alumnos. Creá el primero para empezar.</div>'}</div>`);
+ modal('Mis alumnos',`<div class="portal-intro"><span class="portal-tag">ESPACIO ENTRENADOR</span><p>Administrá cada alumno por separado. Abrí sus resultados en la pantalla principal para revisar sus series y progresar su planificación.</p><div class="portal-actions"><button class="button small primary" id="addCoachStudent">+ Agregar alumno</button><button class="button small" id="resetCoachSelection">Mi entrenamiento</button><button class="button small" id="coachInviteOnline">🔗 Invitación online</button></div></div><div class="student-grid">${content||'<div class="portal-empty">Todavía no tenés alumnos. Creá el primero para empezar.</div>'}</div>`);
 }
 function coachResults(index){
  const s=coachData()[index];if(!s)return;
@@ -140,7 +140,7 @@ async function acceptIncoming(){
 }
 $('shareToggle').onclick=()=>{const e=$('shareChoices');e.classList.toggle('hidden');$('shareToggle').setAttribute('aria-expanded',String(!e.classList.contains('hidden')))};
 $('shareTraining').onclick=()=>{$('shareChoices').classList.add('hidden');doShare('day')};$('shareWeek').onclick=()=>{$('shareChoices').classList.add('hidden');doShare('week')};$('coachPanel').onclick=()=>coachView();
-$('modalBody').addEventListener('click',async ev=>{const t=ev.target;try{if(t.id==='copyShareLink'){await navigator.clipboard.writeText(window._outShare.link);alert('Enlace copiado')}else if(t.id==='downloadShareFile'){const blob=new Blob([JSON.stringify(window._outShare.payload,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='Obsidiana-compartir.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1500)}else if(t.id==='addCoachStudent'){const n=prompt('Nombre del alumno:')?.trim();if(!n)return;if(n.length>80||coachData().some(x=>x.name.toLowerCase()===n.toLowerCase())){alert('Nombre inválido o repetido');return}coachData().push({name:n,received:[]});await persist();coachView()}else if(t.id==='resetCoachSelection'){await enterWorkspace('');coachView()}else if(t.dataset.coachEdit!==undefined){
+$('modalBody').addEventListener('click',async ev=>{const t=ev.target;try{if(t.id==='copyShareLink'){await navigator.clipboard.writeText(window._outShare.link);alert('Enlace copiado')}else if(t.id==='downloadShareFile'){const blob=new Blob([JSON.stringify(window._outShare.payload,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='Obsidiana-compartir.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1500)}else if(t.id==='coachInviteOnline'){await window.obsidianaLinking.showLinks()}else if(t.id==='addCoachStudent'){const n=prompt('Nombre del alumno:')?.trim();if(!n)return;if(n.length>80||coachData().some(x=>x.name.toLowerCase()===n.toLowerCase())){alert('Nombre inválido o repetido');return}coachData().push({name:n,received:[]});await persist();coachView()}else if(t.id==='resetCoachSelection'){await enterWorkspace('');coachView()}else if(t.dataset.coachEdit!==undefined){
   const idx=Number(t.dataset.coachEdit),s=coachData()[idx];if(!s)return;
   const oldName=s.name;
   const n=prompt('Nuevo nombre del alumno:',oldName)?.trim();

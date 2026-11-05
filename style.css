@@ -244,3 +244,69 @@ input::placeholder,textarea::placeholder{color:#85909E}
  .mobile-compact-group>b{color:#B5BDCA}
  .mobile-options>summary,.mobile-day-options>summary{background:#252B33;border-color:#3A424D}
 }
+
+/* Obsidiana Android 0.1.1 — espacio para la barra de estado y selector de descanso */
+@media(max-width:760px){
+ html.obs-native-android .top{padding-top:calc(12px + max(28px,env(safe-area-inset-top,0px)));min-height:78px}
+ .mobiletimer{display:flex;gap:7px;align-items:center;justify-content:space-between}
+ .mobile-duration-label{font-size:10px;letter-spacing:0;color:var(--muted);flex:0 0 auto}
+ .mobiletimer #mobileDuration{display:block;width:68px;min-width:0;min-height:34px;height:34px;padding:4px 5px;font-size:13px;flex:0 0 68px;background:#262B33;border-color:#464D59;border-radius:9px}
+ .mobiletimer #mobileTimer{font-size:18px;white-space:nowrap;flex:0 0 auto}
+ .mobiletimer #mobileToggle{flex:0 0 auto;min-height:34px;padding:6px 10px}
+ .mobiletimer #mobileReset{flex:0 0 auto;min-height:34px;padding:6px 9px}
+}
+@media(max-width:390px){.mobile-duration-label{display:none}.mobiletimer #mobileDuration{width:70px;flex-basis:70px}}
+
+/* Acceso Google: discreto y adaptable a la pantalla */
+.top { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+.auth-area { display:flex; flex-direction:column; align-items:flex-end; gap:4px; min-width:0; }
+.auth-button { font-size:13px; padding:9px 12px; }
+.auth-detail { color:#aeb3bd; font-size:11px; max-width:285px; text-align:right; overflow-wrap:anywhere; }
+@media(max-width:600px){.auth-area { align-items:flex-end; flex:1; }.auth-detail{font-size:10px;max-width:170px;} .auth-button{font-size:11px;padding:7px 9px;} .top .brand{font-size:13px;}}
+
+/* Obsidiana Conectada */
+.link-code{font-size:1.65rem;letter-spacing:.13em;font-weight:800;text-align:center;padding:18px;border-radius:14px;background:#242830;border:1px solid #5e4b7f;color:#d7b7ff;overflow-wrap:anywhere}
+.obs-link-row{display:flex;flex-direction:column;gap:5px;padding:12px;border:1px solid #333842;border-radius:12px;margin-bottom:10px}.obs-link-row small{color:#b2b4bf}
+#obsInvitationInput{display:block;width:100%;margin-top:8px}
+
+/* Obsidiana Conectada: bandeja */
+.obs-inbox-row {display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 0;border-bottom:1px solid #343941}
+.obs-inbox-row>div{display:flex;flex-direction:column;gap:4px;min-width:0}
+.obs-inbox-row small{color:#9da4b0;overflow-wrap:anywhere}
+@media(max-width:640px){.obs-inbox-row{align-items:stretch;flex-direction:column}.obs-inbox-row button{align-self:flex-start}}
+
+/* Obsidiana: planificación editable por serie, pensada para pantallas móviles */
+.plan-edit .plan-set-section{grid-column:1/-1;min-width:0;margin-top:5px}
+.plan-general-weight{display:block;max-width:270px;font-size:12px!important;font-weight:600;color:#D5D8DF}
+.plan-general-weight input{display:block;max-width:100%;margin-top:8px}
+.plan-help{font-size:11px;line-height:1.45;color:var(--muted);margin:7px 0 16px}
+.plan-series-heading,.plan-set-row{display:grid;grid-template-columns:28px minmax(0,110px) minmax(0,110px) 32px;gap:9px;align-items:center}
+.plan-series-heading{color:var(--muted);font-size:10px;letter-spacing:.06em;margin:0 0 6px}
+.plan-set-row{margin-bottom:10px}
+.plan-set-row input{min-width:0;width:100%;margin:0;text-align:center;min-height:44px}
+.plan-set-label{font-size:13px;color:#CED2DB}
+.plan-remove-set{min-width:32px;min-height:36px;cursor:pointer;color:#C7A4C2;background:#ffffff08;border:1px solid #ffffff19;border-radius:9px;font-size:20px}
+.plan-remove-set:hover,.plan-remove-set:focus-visible{border-color:#AD7BE8;color:#F1D9E9}
+.plan-series-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:8px 0 18px}
+.plan-set-counter{font-size:11px;color:var(--muted)}
+.plan-save{min-height:44px}
+@media(max-width:460px){
+ .plan-series-heading,.plan-set-row{grid-template-columns:24px minmax(0,1fr) minmax(0,1fr) 32px;gap:7px}
+ .plan-set-row input{font-size:16px}
+ .plan-general-weight{max-width:none}
+}
+
+/* Elección RIR/RPE sin saturar la cabecera móvil */
+.effort-scale-control{display:flex;align-items:center;gap:8px;margin-left:auto;color:#b4bcc8;font-size:11px;white-space:nowrap}
+.effort-scale-control select{min-height:36px;padding:7px 8px;font-size:12px;background:#242830;border-color:#ffffff22}
+.volume-option{display:flex;align-items:center;gap:9px;grid-column:1/-1;font-size:11px;line-height:1.45;margin-top:6px}
+.volume-option input{width:18px;min-width:18px;min-height:18px;accent-color:#A77BE8}
+@media(max-width:760px){.effort-scale-control{margin-left:0}.effort-scale-control select{min-height:36px}.workspace-bar{flex-wrap:wrap}}
+
+/* iPhone / iPad: modo aplicación instalada, respetando isla dinámica y barra inferior. */
+@supports (padding: env(safe-area-inset-top)) {
+  @media (display-mode: standalone) and (max-width: 760px) {
+    html:not(.obs-native-android) .top {padding-top: calc(12px + env(safe-area-inset-top));}
+    html:not(.obs-native-android) .overlay {padding-top: max(15px, env(safe-area-inset-top));padding-bottom: max(15px, env(safe-area-inset-bottom));}
+  }
+}

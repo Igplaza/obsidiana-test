@@ -1,0 +1,42 @@
+OBSIDIANA · VERSIÓN PARA IPHONE (PWA DE PRUEBA)
+==============================================
+
+Qué contiene:
+- Los mismos archivos web que la actualización unificada RIR/RPE de Android.
+- Ícono de la gema violeta (manifest + apple-touch-icon).
+- Configuración para instalar en pantalla de inicio de iPhone.
+- Service Worker con caché básico para interfaz, no para Supabase ni para compartir en línea.
+- Ajuste del encabezado para la zona de la hora / Isla Dinámica en modo app instalada.
+
+PUBLICAR: NO SUBIR EL ZIP; SUBIR LOS ARCHIVOS DE SU INTERIOR
+1. Hacer primero respaldo de los datos existentes en la web, si los hay.
+2. En GitHub, entrar en igplaza/obsidiana-test > Code > Add file > Upload files.
+3. Subir archivos de esta carpeta A LA RAÍZ del repo. index.html debe quedar en raíz.
+   Subir también la carpeta icons/ con sus imágenes.
+4. Hacer Commit changes y esperar la publicación en GitHub Pages.
+5. Abrir https://igplaza.github.io/obsidiana-test/ desde Safari del iPhone.
+6. Safari > Compartir > Agregar a pantalla de inicio (activar Abrir como app web).
+
+PRUEBAS OBLIGATORIAS ANTES DE INVITAR PERSONAS
+A. Confirmar que abre desde el ícono, sin barra del navegador, encabezado legible.
+B. Registrar un entrenamiento de prueba, cerrar la app y comprobar persistencia.
+C. Iniciar sesión con Google desde la PWA y comprobar retorno a Obsidiana:
+   iOS puede abrir Safari externamente durante OAuth. No asumir que la sesión
+   vuelve a la PWA hasta probarlo en el iPhone concreto.
+D. Revisar Vincular entrenador / Recibidos y el circuito con otra cuenta.
+E. Probar Respaldo: guardar físicamente el JSON en Archivos o Drive.
+
+LIMITACIONES
+- Una PWA no es una IPA ni una app de App Store.
+- La integración entre personas requiere internet. Las funciones locales pueden
+  funcionar sin conexión una vez cacheados los recursos, pero no está garantizado
+  el acceso a todos los flujos desconectados.
+- iOS puede eliminar almacenamiento web bajo determinadas condiciones, por lo que
+  exportar respaldos regularmente es importante.
+- Datos locales en Android y en iPhone NO se sincronizan automáticamente por iniciar sesión.
+- Si se prueba OAuth desde Safari y no devuelve la sesión a la PWA, habrá que
+  adaptar el flujo. NO distribuir la beta conectada sin verificarlo.
+- No subir claves secretas, contraseñas, service_role ni un proyecto Android
+  completo al repositorio público. Esta carpeta solo contiene archivos web.
+
+Esta entrega NO cambia los archivos Android ni la APK actual.
