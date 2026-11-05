@@ -310,3 +310,39 @@ input::placeholder,textarea::placeholder{color:#85909E}
     html:not(.obs-native-android) .overlay {padding-top: max(15px, env(safe-area-inset-top));padding-bottom: max(15px, env(safe-area-inset-bottom));}
   }
 }
+
+/* ===== Obsidiana Web + iPhone · Menú unificado (v20261105-nav2) ===== */
+/* El select de semana y el menú son las únicas acciones de cabecera. */
+.toolbar.obs-nav-ready{display:block;overflow:visible;margin:10px 0 14px}
+.toolbar.obs-nav-ready>.spacer{display:none}
+.mobile-daytools-hidden{display:none!important}
+.mobile-compact-primary{display:grid;grid-template-columns:minmax(0,1fr) 125px;gap:10px;align-items:stretch;width:min(100%,620px)}
+.mobile-week-select{display:flex;align-items:center;gap:10px;min-width:0;padding:5px 12px;border:1px solid #373E49;background:#242830;border-radius:12px;color:#B9C2CD}
+.mobile-week-select>span{font-size:11px;letter-spacing:.09em;font-weight:800;flex:none}
+.mobile-week-select select{flex:1;min-width:0;width:100%;max-width:none;border:0;background:transparent;padding:9px 2px;color:#fff;font-size:15px;font-weight:750;outline-offset:0}
+.mobile-compact-menu{display:block;position:relative;min-width:0;z-index:4}
+.mobile-compact-menu>summary{display:flex;align-items:center;justify-content:center;gap:9px;min-height:48px;height:100%;padding:8px 12px;cursor:pointer;list-style:none;border-radius:12px;background:#292D37;border:1px solid #454653;color:#F1F2F5;font-size:14px;font-weight:750;user-select:none;-webkit-user-select:none}
+.mobile-compact-menu>summary::-webkit-details-marker{display:none}
+.mobile-compact-menu[open]>summary{border-color:#A77BE8;background:#342B40}
+.mobile-compact-panel{position:absolute;right:0;top:calc(100% + 7px);width:min(365px,calc(100vw - 26px));max-height:min(70dvh,620px);overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;z-index:45;background:#1B1F26;border:1px solid #454D59;border-radius:14px;padding:11px;box-shadow:0 16px 42px #000C}
+.mobile-compact-group{display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:11px 0;border-bottom:1px solid #ffffff1a;min-width:0}
+.mobile-compact-group:last-child{border-bottom:0}
+.mobile-compact-group>b{grid-column:1/-1;font-size:11px;color:#B5BDCA;letter-spacing:.04em}
+.mobile-compact-group>.button,.mobile-compact-group>.share-menu,.mobile-compact-group>.delete-menu{display:block!important;min-width:0;width:100%;margin:0}
+.mobile-compact-group .button{width:100%;max-width:none;min-width:0;min-height:43px;margin:0;padding:9px 7px;white-space:normal;text-align:center;font-size:12px}
+.mobile-compact-group .button-sub{display:none}
+.mobile-compact-group .share-menu,.mobile-compact-group .delete-menu{display:grid;align-items:stretch}
+.mobile-compact-group .share-choices,.mobile-compact-group .delete-options{position:static;display:grid;gap:6px;width:100%;min-width:0;margin-top:7px;padding:6px;border-color:#414755;box-shadow:none;background:#222832;z-index:auto}
+.mobile-compact-group .share-choices .button,.mobile-compact-group .delete-options .button{text-align:left;padding-left:11px}
+/* El cuadro de opciones nunca se superpone con los modales. */
+.overlay{z-index:80}
+@media(max-width:760px){
+ .toolbar.obs-nav-ready{margin:6px 0 10px}
+ .mobile-compact-primary{grid-template-columns:minmax(0,1fr) 108px;gap:9px;width:100%}
+ .mobile-week-select{padding:5px 10px}
+ .mobile-week-select>span{font-size:10px}
+ .mobile-compact-panel{max-height:67dvh}
+}
+@media(min-width:761px){
+ .toolbar.obs-nav-ready+.daytools{display:none!important}
+}

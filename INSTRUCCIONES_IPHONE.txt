@@ -40,3 +40,11 @@ LIMITACIONES
   completo al repositorio público. Esta carpeta solo contiene archivos web.
 
 Esta entrega NO cambia los archivos Android ni la APK actual.
+
+NAVEGACIÓN COMPACTA · ACTUALIZACIÓN
+- La misma barra Semana + Menú está disponible en iPhone y en la web de escritorio.
+- Se mantienen visibles los días, el esfuerzo RIR/RPE y + Ejercicio.
+- En Menú están planificación, compartir, alumnos, estadísticas, respaldo y edición de días.
+- Al seleccionar una opción, el menú se cierra automáticamente (también Recibidos).
+- No cambia almacenamiento, historial ni los métodos de intercambio.
+- Si Safari muestra una versión vieja, cerrá y reabrí la PWA; tras la actualización del Service Worker, volvé a abrirla.
