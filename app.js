@@ -78,7 +78,7 @@ function planMarkup(e){
   </div>
  </div>`;
 }
-function completed(e){return !!e.updated&&e.sets.length>0&&e.sets.every(s=>s.kg!==null&&s.reps!==null&&s.reps>0)}
+function completed(e){return !!e.updated&&e.sets.length>0&&e.sets.every(s=>s.kg!==null&&s.reps!==null&&s.reps>0&&s.rir!==null&&s.rir!==undefined)}
 function summary(e){
  if(!completed(e))return `${e.sets.length} series · Pendiente`;
  const weights=[...new Set(e.sets.map(s=>s.kg))];
@@ -270,6 +270,17 @@ async function makeWeek(mode){
   : mode==='deload'
     ? 'Se generará una propuesta automática de descarga que podrás modificar. Al terminar la descarga, la progresión continuará desde la última semana normal, no desde la descarga.'
     : 'Se propondrán objetivos automáticamente a partir de los registros. Podrás modificarlos.';
+ // Diagnóstico antes de crear una semana automática.
+ // Cuando falta algún dato, no inventamos el RIR/RPE ni bloqueamos otros ejercicios completos.
+ if(mode==='auto' && source.kind!=='deload'){
+  const checks=source.days.flatMap(d=>d.exercises.map(e=>({name:e.name,day:d.name||'Día '+d.number,check:ObsidianaProgression.inspectRecord({...e,plan:planOf(e)})})));
+  const toReview=checks.filter(x=>!x.check.ready);
+  if(checks.length && toReview.length===checks.length){
+   alert('Todavía no hay ejercicios listos para progresar.\n\n'+toReview.slice(0,6).map(x=>'• '+x.day+' / '+x.name+': '+x.check.reason).join('\n')+(toReview.length>6?'\n… y '+(toReview.length-6)+' más.':'')+'\n\nLos registros ya cargados no se modificaron.');
+   return;
+  }
+  if(toReview.length && !confirm('Hay '+toReview.length+' ejercicio(s) que conservarán su objetivo sin cambios.\n\n'+toReview.slice(0,5).map(x=>'• '+x.name+': '+x.check.reason).join('\n')+(toReview.length>5?'\n… y '+(toReview.length-5)+' más.':'')+'\n\n¿Querés progresar los demás igualmente?'))return;
+ }
  if(!confirm(`${title}: crear semana ${next} desde la semana ${currentWeek}?\n\n${explanation}\n\nLos entrenamientos anteriores no se modificarán.`))return;
  const nw={number:next,kind:mode==='deload'?'deload':'normal',days:source.days.map(d=>({number:d.number,name:d.name||'Día '+d.number,exercises:d.exercises.map(e=>{
    let plan;
@@ -284,7 +295,7 @@ async function makeWeek(mode){
  })}))};
  const oldWeek=currentWeek,oldDay=currentDay;
  model.weeks.push(nw);currentWeek=next;currentDay=nw.days[0].number;
- try{await persist();render();alert(`${title}: semana creada. Los objetivos están separados de lo realizado y se pueden editar.`)}catch(e){model.weeks.pop();currentWeek=oldWeek;currentDay=oldDay;alert('Error al crear semana: '+e.message)}
+ try{await persist();render();const review=nw.days.flatMap(d=>d.exercises.filter(e=>e.plan.requiresReview).map(e=>e.name+': '+e.plan.reason));alert(`${title}: semana creada. Los objetivos se pueden editar.`+(review.length?'\n\nSin progresión automática ('+review.length+'):\n'+review.slice(0,5).join('\n'):'') )}catch(e){model.weeks.pop();currentWeek=oldWeek;currentDay=oldDay;alert('Error al crear semana: '+e.message)}
 }
 $('deleteWeek').onclick=async()=>{
  if(!guardDirty())return;

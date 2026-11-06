@@ -9,8 +9,23 @@ const clone=x=>JSON.parse(JSON.stringify(x));
 const rirToRpe=x=>n(x)===null?null:Math.max(1,Math.min(10,Math.round((10-x)*2)/2));
 const rpeToRir=x=>n(x)===null?null:Math.round((10-x)*2)/2;
 function sameSets(a,b){return Array.isArray(a)&&Array.isArray(b)&&a.length===b.length&&a.every((s,i)=>close(s.kg,b[i].kg)&&s.reps===b[i].reps)}
-function readyRecord(x,p){
- return x&&Array.isArray(x.sets)&&x.sets.length===p.sets.length&&x.updated&&x.sets.every((s,i)=>n(s.kg)!==null&&n(s.reps)!==null&&s.reps>0&&n(s.rir)!==null&&close(s.kg,p.sets[i].kg));
+// Verificación clara antes de aplicar progresión automática.
+// No confundir una carga distinta al objetivo con un registro incompleto.
+function inspectRecord(source){
+ const plan=source?.plan, planned=plan?.sets;
+ if(!source?.updated)return {ready:false,kind:'missing',reason:'Sin registro guardado · abrí el ejercicio y tocá «Guardar registro»'};
+ if(!Array.isArray(planned)||!planned.length)return {ready:false,kind:'plan',reason:'Falta configurar el objetivo planificado'};
+ if(!Array.isArray(source.sets)||!source.sets.length)return {ready:false,kind:'missing',reason:'Sin series realizadas guardadas'};
+ if(source.sets.length!==planned.length)return {ready:false,kind:'series',reason:`Cantidad de series distinta: ${source.sets.length} realizadas, ${planned.length} planificadas · revisá el objetivo`};
+ for(let i=0;i<planned.length;i++){
+  const s=source.sets[i],p=planned[i],label=`Serie ${i+1}`;
+  if(n(p.kg)===null || n(p.reps)===null || p.reps<1)return {ready:false,kind:'plan',reason:`${label}: faltan kg o repeticiones en el objetivo`};
+  if(n(s?.kg)===null)return {ready:false,kind:'missing',reason:`${label}: falta registrar el peso (kg)`};
+  if(n(s?.reps)===null || s.reps<=0)return {ready:false,kind:'missing',reason:`${label}: faltan las repeticiones realizadas`};
+  if(n(s?.rir)===null)return {ready:false,kind:'missing',reason:`${label}: falta RIR/RPE realizado · cargalo y guardá`};
+  if(!close(s.kg,p.kg))return {ready:false,kind:'weight',reason:`${label}: hiciste ${s.kg} kg y el objetivo era ${p.kg} kg · revisá la carga antes de progresar`};
+ }
+ return {ready:true,kind:'ready',reason:''};
 }
 function eligiblePast(x,reference){
  return !!x?.updated && Array.isArray(x.sets)&&x.sets.length===reference.sets.length&&x.sets.every((s,i)=>n(s.reps)!==null&&n(s.rir)!==null&&close(s.kg,reference.sets[i].kg));
@@ -21,9 +36,9 @@ function propose(source,mode,history=[]){
  const ret=(sets,reason,more={})=>({...p,sets,reason,volumeCandidate:false,...more});
  if(mode==='manual')return ret(existing,'Objetivo manual · editable');
  if(mode==='deload')return ret(existing.slice(0,Math.max(1,Math.ceil(existing.length*0.5))).map(s=>({...s,reps:s.reps==null?null:Math.max(1,Math.min(s.reps,p.max))})), 'Descarga · menos series y mayor margen',{rir:Math.max(3.5,p.rir??1)});
- if(!source.updated || !Array.isArray(source.sets) || source.sets.length!==existing.length || existing.some(s=>n(s.kg)===null||n(s.reps)===null))return ret(existing,'Registro incompleto · mantenemos objetivos');
+ const diagnosis=inspectRecord(source);
+ if(!diagnosis.ready)return ret(existing,diagnosis.reason,{requiresReview:true,reviewKind:diagnosis.kind});
  const performed=source.sets;
- if(!readyRecord(source,p))return ret(existing,'Series, cargas o esfuerzo incompletos · revisar antes de progresar');
  const target=n(p.rir)??1;
  const min=n(p.min)??8, max=n(p.max)??12;
  if(max<min || max<=0)return ret(existing,'Rango de repeticiones inválido · revisá objetivo');
@@ -63,7 +78,7 @@ function propose(source,mode,history=[]){
  if(plateau&&p.volumeEnabled!==false)reason+=' · 3 sesiones similares: podés evaluar +1 serie si recuperás bien';
  return ret(out,reason,{volumeCandidate:!!(plateau&&p.volumeEnabled!==false)});
 }
-const api={propose,rirToRpe,rpeToRir,sameSets};
+const api={propose,inspectRecord,rirToRpe,rpeToRir,sameSets};
 root.ObsidianaProgression=api;
 if(typeof module==='object'&&module.exports)module.exports=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
