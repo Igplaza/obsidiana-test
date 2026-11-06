@@ -21395,6 +21395,9 @@ ${suffix}`;
       detectSessionInUrl: !Capacitor.isNativePlatform()
     }
   });
+  // Comparte la misma instancia autenticada con Vinculaciones y Recibidos.
+  // La clave pública no concede acceso a datos sin las políticas RLS de Supabase.
+  window.obsidianaSupabase = supabase;
   var btn = document.getElementById("authButton");
   var detail = document.getElementById("authDetail");
   var session = null;
