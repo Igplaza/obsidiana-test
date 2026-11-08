@@ -1,4 +1,4 @@
-/* Obsidiana · Progresión v5.
+/* Obsidiana · Progresión v6.
    Recomendaciones orientativas, conservadoras y editables; no sustituyen al entrenador.
    Almacenamiento interno de esfuerzo: RIR. RPE fuerza = 10 - RIR. */
 (function(root){
@@ -41,52 +41,63 @@ function oneSide(source,mode,history=[]){
  const old=(p.sets||[]).map(s=>({kg:s.kg??null,reps:s.reps??null}));
  const ret=(sets,reason,extra={})=>({...p,sets,reason,volumeCandidate:false,...extra});
  if(mode==='manual')return ret(old,'Objetivo manual · editable');
- if(mode==='deload')return ret(old.slice(0,Math.max(1,Math.ceil(old.length/2))), 'Descarga · menos series y más margen',{rir:Math.max(3.5,p.rir??1)});
+ if(mode==='deload')return ret(old.slice(0,Math.max(1,Math.ceil(old.length/2))),
+  'Descarga · menos series, más margen',{rir:Math.max(3.5,p.rir??1)});
  const diagnosis=inspectSingle(source);
- if(!diagnosis.ready)return ret(old,diagnosis.reason,{requiresReview:true,reviewKind:diagnosis.kind});
- const performed=source.sets, min=n(p.min)??8,max=n(p.max)??12,target=n(p.rir)??1;
- if(max<min||min<1)return ret(old,'Rango inválido · corregí el objetivo',{requiresReview:true});
+ if(!diagnosis.ready){
+  const reason=diagnosis.kind==='series'||diagnosis.kind==='plan'
+    ?'Cambiaste series o cargas · revisá el objetivo antes de continuar'
+    :/rir|rpe/i.test(diagnosis.reason)
+      ?'Falta registrar el RIR · repetimos el objetivo'
+      :'Faltan datos de la sesión anterior · repetimos el objetivo';
+  return ret(old,reason,{requiresReview:true,reviewKind:diagnosis.kind,reviewDetail:diagnosis.reason});
+ }
+ const performed=source.sets,min=n(p.min)??8,max=n(p.max)??12,target=n(p.rir)??1;
+ if(max<min||min<1)return ret(old,'Cambiaste series o cargas · revisá el objetivo antes de continuar',
+  {requiresReview:true,reviewKind:'range',reviewDetail:'El rango de repeticiones no es válido'});
  const actual=performed.map(s=>({kg:s.kg,reps:s.reps}));
- const missed=performed.some((s,i)=>s.reps<old[i].reps);
- const effortLow=performed.some(s=>s.rir<target);
- const changedWeight=performed.some((s,i)=>!close(s.kg,old[i].kg));
- if(missed){
-  // Nunca volver a mandar las reps FALLIDAS como si se hubieran conseguido.
-  return ret(actual,effortLow
-   ?'Recuperar · repetir lo realmente conseguido, buscando el RIR/RPE objetivo'
-   :'Recuperar · consolidar las repeticiones realmente realizadas antes de progresar',
-   {reviewKind:changedWeight?'weightAdjusted':undefined});
- }
- if(effortLow||performed.some(s=>s.rir<=0))return ret(actual,'Consolidar · esfuerzo más alto de lo previsto; mantener lo conseguido');
- if(changedWeight)return ret(actual,'Consolidar · hubo cambio de carga; primero confirmar el rendimiento con el peso realmente utilizado',{reviewKind:'weightAdjusted'});
- const inc=n(p.increment),canAddWeight=inc!==null&&inc>0;
  const minRir=Math.min(...performed.map(s=>s.rir));
- const strong=minRir>=3 && minRir>=target+1 && target<3;
+ const missed=performed.some((s,i)=>s.reps<old[i].reps);
+ const effortLow=minRir<target;
+ const atLimit=minRir<=0;
+ const changedWeight=performed.some((s,i)=>!close(s.kg,old[i].kg));
+ const exceeded=performed.some((s,i)=>s.reps>old[i].reps);
+ if(missed)return ret(actual,(effortLow||atLimit)
+  ?'No alcanzaste el objetivo y llegaste al límite · repetí lo realizado buscando más margen'
+  :'No alcanzaste todas las reps · intentá completarlas antes de progresar',
+  {reviewKind:changedWeight?'weightAdjusted':undefined});
+ // RIR 0: NUNCA aumentar peso ni repeticiones, incluso con objetivo RIR 0.
+ if(effortLow||atLimit)return ret(actual,exceeded
+  ?'Superaste las reps, pero llegaste al límite · repetí lo realizado con mejor margen'
+  :'Llegaste al límite · repetí las mismas reps buscando más margen');
+ if(changedWeight)return ret(actual,
+  'Cambiaste series o cargas · revisá el objetivo antes de continuar',
+  {reviewKind:'weightAdjusted'});
+ const inc=n(p.increment),canAddWeight=inc!==null&&inc>0;
  const top=performed.every(s=>s.reps>=max);
- const overshot=performed.some(s=>s.reps>max);
- const confirmed=history.length>0&&eligiblePast(history[0],source)&&history[0].sets.every(s=>s.reps>=max&&s.rir>=target);
- const extraEffort=performed.every(s=>s.rir>=target+1);
- // RIR >= 3 con objetivo más exigente: evaluar carga antes de regalar +3 reps.
- if(strong){
-  if(canAddWeight)return ret(actual.map(s=>({kg:Math.round((s.kg+inc)*100)/100,reps:Math.max(min,Math.min(max,s.reps-2))})),
-    `Progresar · RIR ${fmt(minRir)}: subir ${inc} kg y reajustar repeticiones`);
-  return ret(actual,'Revisar carga · sobró margen (RIR ≥3): configurá «Subida kg» para evaluar el aumento',{requiresWeightReview:true});
+ // Al llegar al techo basta cumplir el RIR objetivo. No se exige RIR 3
+ // ni repetir el rendimiento durante una segunda sesión.
+ if(top && minRir>=target){
+  if(canAddWeight)return ret(actual.map(s=>({kg:Math.round((s.kg+inc)*100)/100,reps:min})),
+   'Subimos carga · volvemos al inicio del rango de reps');
+  // No quitamos repeticiones realizadas por encima del máximo manteniendo el mismo peso.
+  return ret(actual,'Llegaste al máximo de reps · configurá cuánto subir la carga',
+   {requiresWeightReview:true});
  }
- if(top){
-  if(canAddWeight&&(overshot||extraEffort||confirmed))return ret(actual.map(s=>({kg:Math.round((s.kg+inc)*100)/100,reps:min})),
-    `Progresar · tope de rango${overshot?' superado':''}; subir ${inc} kg y volver a ${min} reps`);
-  if(!canAddWeight)return ret(actual,`Revisar carga · ${overshot?'superaste':'completaste'} el máximo de ${max} reps; configurá «Subida kg». No quitamos reps con el mismo peso`,{requiresWeightReview:true});
-  return ret(actual,'Consolidar · confirmar el máximo una sesión comparable antes de subir carga');
- }
- const minMargin=Math.min(...performed.map(s=>s.rir-target));
- const budget=minMargin>=2?3:minMargin>=1?2:1;
+ // Primero repeticiones dentro del rango. El RIR más bajo de la sesión
+ // decide cuántas series se pueden progresar; no usamos promedios.
+ const margin=minRir-target;
+ const budget=margin>=2?Number.POSITIVE_INFINITY:margin>=1?2:1;
  const next=copy(actual),changed=[];
- for(let i=0;i<next.length && changed.length<budget;i++){
+ for(let i=0;i<next.length&&changed.length<budget;i++){
   if(next[i].reps<max){next[i].reps++;changed.push(i+1)}
  }
  let reason=changed.length
-  ?`Progresar · +1 repetición en ${changed.length===1?'la serie '+changed[0]:'las series '+changed.join(' y ')} (${performed.map(s=>s.reps).join('-')} → ${next.map(s=>s.reps).join('-')})`
-  :`Consolidar · ninguna serie puede superar ${max} reps`;
+  ?describeRepetitionProgress(actual,next)
+  :exceeded
+    ?'Superaste el objetivo · mantenemos este rendimiento antes de volver a progresar'
+    :'Repetí el mismo objetivo antes de progresar';
+ // El número de series permanece igual: el volumen adicional es solo una sugerencia.
  const currentSets=performed.map(s=>({kg:s.kg,reps:s.reps}));
  const plateau=[source,...history.slice(0,2)];
  const stalled=plateau.length===3&&plateau.every(x=>eligiblePast(x,source)&&sameSets(x.sets,currentSets)&&x.sets.every(s=>s.rir>=target))&&old.length<5;
@@ -101,10 +112,10 @@ function sideSource(source,side){return {
 function propose(source,mode,history=[]){
  if(!source?.unilateral)return oneSide(source,mode,history);
  const p=source.plan||{};
- if(mode==='manual')return {...copy(p),reason:'Objetivo unilateral manual · editable',volumeCandidate:false};
+ if(mode==='manual')return {...copy(p),reason:'Objetivo manual · editable',volumeCandidate:false};
  if(mode==='deload'){
   const count=Math.max(1,Math.ceil((p.sets||[]).length/2));
-  return {...copy(p),sets:copy((p.sets||[]).slice(0,count)),rir:Math.max(3.5,p.rir??1),reason:'Descarga unilateral · menos series y más margen',volumeCandidate:false};
+  return {...copy(p),sets:copy((p.sets||[]).slice(0,count)),rir:Math.max(3.5,p.rir??1),reason:'Descarga · menos series, más margen',volumeCandidate:false};
  }
  const diagnosis=inspectRecord(source);
  if(!diagnosis.ready)return {...copy(p),reason:diagnosis.reason,requiresReview:true,reviewKind:diagnosis.kind,volumeCandidate:false};
@@ -126,9 +137,44 @@ function describeRepetitionProgress(previous,next){
  if(previous.some((s,i)=>!close(s.kg,next[i].kg)||n(s.reps)===null||n(next[i].reps)===null))return null;
  const changed=previous.map((s,i)=>next[i].reps===s.reps+1?i+1:null).filter(Boolean);
  if(!changed.length||previous.some((s,i)=>next[i].reps<s.reps||next[i].reps>s.reps+1))return null;
- return `Progresar · +1 repetición en ${changed.length===1?'la serie '+changed[0]:'las series '+changed.join(' y ')} (${previous.map(x=>x.reps).join('-')} → ${next.map(x=>x.reps).join('-')})`;
+ return `Progresamos · sumamos repeticiones · +1 repetición en ${changed.length===1?'la serie '+changed[0]:'las series '+changed.join(' y ')} (${previous.map(x=>x.reps).join('-')} → ${next.map(x=>x.reps).join('-')})`;
 }
-const api={propose,inspectRecord,rirToRpe,rpeToRir,sameSets,goalSide,describeRepetitionProgress};
+// Leyendas legibles para planes creados con motores anteriores.
+// Solo cambia el texto visible; nunca recalcula ni modifica una semana guardada.
+function displayReason(reason){
+ const r=String(reason||'');
+ const mappings=[
+  ['Sin registro completo · mantenemos el objetivo','Faltan datos de la sesión anterior · repetimos el objetivo'],
+  ['Series o pesos distintos · revisá el objetivo','Cambiaste series o cargas · revisá el objetivo antes de continuar'],
+  ['Falta RIR · mantenemos el objetivo','Falta registrar el RIR · repetimos el objetivo'],
+  ['Recuperar · completá las reps con mejor margen','No alcanzaste el objetivo y llegaste al límite · repetí lo realizado buscando más margen'],
+  ['Recuperar · completá las reps pendientes','No alcanzaste todas las reps · intentá completarlas antes de progresar'],
+  ['Objetivo superado · ahora buscá mejor RIR','Superaste las reps, pero llegaste al límite · repetí lo realizado con mejor margen'],
+  ['Consolidar · mismas reps, mejor RIR','Llegaste al límite · repetí las mismas reps buscando más margen'],
+  ['Progresar · aumento de peso propuesto','Subimos carga · volvemos al inicio del rango de reps'],
+  ['Tope de reps · configurá subida de kg','Llegaste al máximo de reps · configurá cuánto subir la carga'],
+  ['Superaste el objetivo · seguimos desde lo realizado','Superaste el objetivo · la próxima progresión parte de lo que hiciste'],
+  ['Progresar · sumamos repeticiones','Progresamos · sumamos repeticiones'],
+  ['Objetivo superado · buen progreso','Superaste el objetivo · mantenemos este rendimiento antes de volver a progresar'],
+  ['Consolidar · mismo objetivo','Repetí el mismo objetivo antes de progresar'],
+  ['Descarga · menos series y más margen','Descarga · menos series, más margen'],
+  ['Consolidar · confirmar el máximo una sesión comparable antes de subir carga','Repetí el mismo objetivo antes de progresar'],
+  ['Recuperar · repetir lo realmente conseguido, buscando el RIR/RPE objetivo','No alcanzaste el objetivo y llegaste al límite · repetí lo realizado buscando más margen'],
+  ['Recuperar · consolidar las repeticiones realmente realizadas antes de progresar','No alcanzaste todas las reps · intentá completarlas antes de progresar'],
+  ['Consolidar · esfuerzo más alto de lo previsto; mantener lo conseguido','Llegaste al límite · repetí las mismas reps buscando más margen'],
+  ['Consolidar · hubo cambio de carga; primero confirmar el rendimiento con el peso realmente utilizado','Cambiaste series o cargas · revisá el objetivo antes de continuar'],
+  ['Revisar carga · sobró margen','Repetí el mismo objetivo antes de progresar'],
+  ['Revisar carga ·','Llegaste al máximo de reps · configurá cuánto subir la carga'],
+  ['Progresar · tope de rango','Subimos carga · volvemos al inicio del rango de reps'],
+  ['Progresar · RIR','Subimos carga · volvemos al inicio del rango de reps'],
+  ['Progresar · +1 repetición','Progresamos · sumamos repeticiones · +1 repetición']
+ ];
+ if(r.startsWith("Progresar · +1 repetición"))return "Progresamos · sumamos repeticiones · +1 repetición"+r.slice("Progresar · +1 repetición".length);
+ for(const [from,to] of mappings){if(r.startsWith(from))return to;}
+ return r;
+}
+
+const api={propose,inspectRecord,rirToRpe,rpeToRir,sameSets,goalSide,describeRepetitionProgress,displayReason};
 root.ObsidianaProgression=api;
 if(typeof module==='object'&&module.exports)module.exports=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

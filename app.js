@@ -22,7 +22,7 @@ function planOf(e){
 }
 function planText(e){const p=planOf(e),reps=p.sets.map(s=>s.reps??'—').join('-');const weights=[...new Set(p.sets.map(s=>s.kg).filter(x=>x!==null))];return `${e.unilateral?'Unilateral · ':''}${p.sets.length} series · ${reps} reps · ${weights.length===1?weights[0]+' kg':weights.length?'cargas variadas':'peso a definir'} · ${effortLabel()} objetivo ${shownEffort(p.rir)}`}
 function inputNumber(v){return v===null||v===undefined?'':v}
-function reasonClass(reason){const r=String(reason||'').toLocaleLowerCase('es');if(r.startsWith('recuperar'))return 'recuperar';if(r.startsWith('consolidar'))return 'consolidar';if(r.startsWith('progresar'))return 'progresar';if(r.startsWith('superaste')||r.startsWith('objetivo superado'))return 'superado';if(r.startsWith('descarga'))return 'descarga';if(r.includes('manual')||r.includes('personalizado'))return 'manual';return 'neutral'}
+function reasonClass(reason){const r=String(reason||'').toLocaleLowerCase('es');if(r.startsWith('recuperar')||r.startsWith('no alcanzaste'))return 'recuperar';if(r.startsWith('consolidar')||r.startsWith('llegaste al límite'))return 'consolidar';if(r.startsWith('progresar')||r.startsWith('progresamos')||r.startsWith('subimos carga'))return 'progresar';if(r.startsWith('superaste')||r.startsWith('objetivo superado'))return 'superado';if(r.startsWith('descarga'))return 'descarga';if(r.includes('manual')||r.includes('personalizado'))return 'manual';return 'neutral'}
 function previousExercise(e){
  if(!model||!Array.isArray(model.weeks))return null;
  const older=model.weeks.filter(w=>w.number<currentWeek).sort((a,b)=>b.number-a.number);
@@ -36,10 +36,17 @@ function previousExercise(e){
 // El texto visible se recalcula sin editar ni borrar los datos originales.
 function actualProgressReason(e){
  const p=planOf(e),reason=p.reason||'';
- if(!/^progresar/i.test(reason)||!/rep(etici[oó]n|s)?/i.test(reason))return reason;
+ if(e.unilateral){
+  const match=reason.match(/^Izquierda: (.*?) · Derecha: (.*)$/s);
+  if(match){
+   if(match[1]===match[2])return 'Ambos lados · '+ObsidianaProgression.displayReason(match[1]);
+   return 'Izquierda: '+ObsidianaProgression.displayReason(match[1])+'\nDerecha: '+ObsidianaProgression.displayReason(match[2]);
+  }
+ }
+ if(!/^(progresar|progresamos)/i.test(reason)||!/rep(etici[oó]n|s)?/i.test(reason))return ObsidianaProgression.displayReason(reason);
  const prev=previousExercise(e);
- if(!prev?.exercise.updated)return reason;
- return ObsidianaProgression.describeRepetitionProgress(prev.exercise.sets,p.sets)||reason;
+ if(!prev?.exercise.updated)return ObsidianaProgression.displayReason(reason);
+ return ObsidianaProgression.describeRepetitionProgress(prev.exercise.sets,p.sets)||ObsidianaProgression.displayReason(reason);
 }
 function openWeekComparison(e){
  // Comparación estrictamente por ejercicio. Se consultan los datos persistidos,
@@ -93,17 +100,18 @@ function planSetMarkup(x,i){
   return xval!=null&&Number(xval)!==Number(key==='kg'?baseK:baseR)?xval:null;
  };
  const hasDifference=['left','right'].some(side=>['reps','kg'].some(key=>overrideValue(side,key)!==null));
+ const preferredSide=['left','right'].find(side=>['reps','kg'].some(key=>overrideValue(side,key)!==null))||'left';
  const sideUI=side=>{
   const name=side==='left'?'Izquierda':'Derecha';
-  return `<div class="plan-side-target"><b>${name}</b><label>Reps<input data-plan-side="${side}-reps" type="number" min="1" max="200" inputmode="numeric" placeholder="Igual" value="${escapeHtml(inputNumber(overrideValue(side,'reps')))}" aria-label="${name}: repeticiones diferentes"></label><label>kg<input data-plan-side="${side}-kg" type="number" min="0" max="1000" step="any" inputmode="decimal" placeholder="Igual" value="${escapeHtml(inputNumber(overrideValue(side,'kg')))}" aria-label="${name}: peso diferente"></label></div>`;
+  return `<div class="plan-side-target ${side!==preferredSide?'hidden':''}" data-editor-side="${side}"><b>Solo ${name.toLowerCase()}</b><label>Reps<input data-plan-side="${side}-reps" type="number" min="1" max="200" inputmode="numeric" placeholder="Igual" value="${escapeHtml(inputNumber(overrideValue(side,'reps')))}" aria-label="${name}: repeticiones diferentes"></label><label>kg<input data-plan-side="${side}-kg" type="number" min="0" max="1000" step="any" inputmode="decimal" placeholder="Igual" value="${escapeHtml(inputNumber(overrideValue(side,'kg')))}" aria-label="${name}: peso diferente"></label></div>`;
  };
  return `<div class="plan-set-row" data-plan-series-row>
    <span class="plan-set-label">S${i+1}</span>
    <input data-plan-reps="${i}" type="number" min="1" max="200" step="1" inputmode="numeric" placeholder="Reps" aria-label="Repeticiones objetivo serie ${i+1}" value="${escapeHtml(inputNumber(baseR))}">
    <input data-plan-kg="${i}" type="number" min="0" max="1000" step="any" inputmode="decimal" placeholder="kg" aria-label="Peso objetivo serie ${i+1}" value="${escapeHtml(inputNumber(baseK))}">
    <button type="button" class="plan-remove-set" data-action="remove-plan-set" title="Quitar serie del objetivo" aria-label="Quitar serie ${i+1} del objetivo">×</button>
-   <div class="plan-side-controls"><button type="button" class="button small sides-toggle ${hasDifference?'changed':''}" data-action="toggle-plan-sides" aria-expanded="${hasDifference}">${hasDifference?'≠ Lados distintos':'≠ Diferencia entre lados'}</button><small>${hasDifference?'Objetivo por lado':'Ambos lados iguales por defecto'}</small></div>
-   <div class="plan-side-targets ${hasDifference?'':'hidden'}">${sideUI('left')}${sideUI('right')}<span class="side-fallback-hint">Dejá vacío lo que sea igual al objetivo general.</span></div>
+   <div class="plan-side-controls"><button type="button" class="button small sides-toggle ${hasDifference?'changed':''}" data-action="toggle-plan-sides" aria-expanded="${hasDifference}">${hasDifference?'✓ Objetivo distinto por lado':'¿Objetivo distinto en un lado?'}</button></div>
+   <div class="plan-side-targets ${hasDifference?'':'hidden'}"><p class="side-panel-help">Si el objetivo es igual a ambos lados, no modifiques nada. Si cambia, elegí el lado y completá solo lo diferente.</p><div class="side-chooser"><button type="button" data-action="choose-side" data-choice="left" aria-pressed="${preferredSide==='left'}">Izquierda</button><button type="button" data-action="choose-side" data-choice="right" aria-pressed="${preferredSide==='right'}">Derecha</button></div>${sideUI('left')}${sideUI('right')}<span class="side-fallback-hint">Los campos vacíos mantienen las repeticiones y kg generales.</span></div>
  </div>`;
 }
 function renumberPlanRows(c){
@@ -121,18 +129,18 @@ function planMarkup(e){
  const sameKg=p.sets.length>0&&p.sets.every(s=>s.kg!==null&&s.kg===p.sets[0].kg);
  return `<div class="plan-panel ${e.unilateral?'editing-unilateral':''}">
   <div class="plan-top"><strong>OBJETIVO PLANIFICADO</strong><div class="plan-tools">${model.weeks.some(w=>w.number<currentWeek&&w.days.some(d=>d.exercises.some(x=>x.exerciseId===e.exerciseId)))?`<button type="button" class="button small" data-action="toggle-previous">↶ Comparar semanas</button>`:``}${e.videoUrl?`<button type="button" class="button small obs-video-open" data-action="open-video">▶ Ver video</button>`:``}<button type="button" class="button small" data-action="edit-video">${e.videoUrl?"✎ Video":"+ Video"}</button><button type="button" class="button small" data-action="toggle-plan">✎ Editar objetivo</button></div></div>
-  <div class="plan-line">${escapeHtml(planText(e))}</div>${actualProgressReason(e)?`<div class="plan-reason ${reasonClass(actualProgressReason(e))}">${escapeHtml(actualProgressReason(e))}</div>`:``}
+  <div class="plan-line">${escapeHtml(planText(e))}</div>${actualProgressReason(e)?`<div class="plan-reason ${reasonClass(actualProgressReason(e))}">${escapeHtml(actualProgressReason(e)).replace(/\n/g,'<br>')}</div>`:``}${(p.requiresWeightReview||/revisar carga/i.test(p.reason||''))?`<button type="button" class="button small weight-cta" data-action="configure-increment">↗ Elegir subida de peso</button>`:''}
   <div class="plan-edit hidden">
    <label class="unilateral-toggle"><input type="checkbox" data-plan="unilateral" ${e.unilateral?'checked':''}> Ejercicio unilateral · registrar izquierda y derecha por separado</label>
    <label>Reps mín.<input data-plan="min" type="number" min="1" max="200" value="${p.min}"></label>
    <label>Reps máx.<input data-plan="max" type="number" min="1" max="200" value="${p.max}"></label>
    <label>${effortLabel()} objetivo<input data-plan="rir" type="number" ${effortRange()} step="0.5" inputmode="decimal" value="${shownEffort(p.rir)}"></label>
-   <label>Subida kg<input data-plan="increment" type="number" min="0" max="100" step="0.5" placeholder="Opcional" value="${inputNumber(p.increment)}"></label>
+   <label class="increment-field">¿Cuánto subir de peso? (+kg)<input data-plan="increment" type="number" min="0" max="100" step="any" inputmode="decimal" placeholder="Ej. 2,5" value="${inputNumber(p.increment)}"></label><div class="increment-helper"><span>Elegí el menor aumento que permita esa máquina o mancuerna:</span><div class="increment-presets">${[1,2,2.5,5].map(k=>`<button type="button" class="button small ${p.increment===k?'selected':''}" data-action="quick-increment" data-value="${k}">+${String(k).replace('.',',')} kg</button>`).join('')}</div><small>Es el aumento del peso que registrás: en un unilateral se aplica a cada lado por separado. Queda guardado para las próximas semanas.</small></div>
    <div class="plan-set-section">
     <label class="plan-general-weight">Peso para todas las series (kg)
      <input data-plan="all-kg" type="number" min="0" max="1000" step="any" inputmode="decimal" placeholder="Ej. 66" value="${sameKg?inputNumber(p.sets[0].kg):''}">
     </label>
-    <p class="plan-help">Se completa en todas las series. Si un lado necesita otro peso o repeticiones, tocá «≠ Diferencia entre lados» en esa serie.</p>
+    <p class="plan-help">Se completa en todas las series. Solo si un lado tiene otro objetivo, tocá «¿Objetivo distinto en un lado?».</p>
     <div class="plan-series-heading"><span></span><span>REPS</span><span>KG</span><span></span></div>
     <div class="plan-series-list">${p.sets.map(planSetMarkup).join('')}</div>
     <div class="plan-series-actions">
@@ -170,7 +178,7 @@ function seriesDetail(e){
  if(e.unilateral)return e.sets.map((s,i)=>`<div class="hist-series unilateral-hist"><strong>S${i+1}</strong>${['left','right'].map(side=>{const x=s.sides?.[side];return `<span>${side==='left'?'Izq.':'Der.'}: <b>${escapeHtml(x?.kg??'—')} kg</b> × ${escapeHtml(x?.reps??'—')} · ${effortLabel()} ${escapeHtml(shownEffort(x?.rir)??'—')}</span>`}).join('')}</div>`).join('');
  return e.sets.map((s,i)=>`<div class="hist-series"><span>Serie ${i+1}</span><b>${escapeHtml(s.kg??'—')} kg</b><span>${escapeHtml(s.reps??'—')} reps</span><span>${effortLabel()} ${escapeHtml(shownEffort(s.rir)??'—')}</span></div>`).join('');
 }
-function render(){if($('effortScale'))$('effortScale').value=effortScale();model.weeks.sort((a,b)=>a.number-b.number);$('week').innerHTML=model.weeks.map(w=>`<option value="${w.number}">Semana ${w.number}</option>`).join('');$('week').value=currentWeek;$('bigWeek').textContent=String(currentWeek).padStart(2,'0');$('days').innerHTML=week().days.map(d=>`<button class="day ${d.number===currentDay?'active':''}" data-day="${d.number}"><b>${escapeHtml(d.name||'Día '+d.number)}</b><small>${d.exercises.filter(completed).length}/${d.exercises.length} completos</small></button>`).join('');$('dayTitle').textContent=day().name||'Día '+currentDay;const es=day().exercises;$('progress').style.width=(es.length?100*es.filter(completed).length/es.length:0)+'%';$('summary').textContent=`${es.filter(completed).length} de ${es.length} ejercicios · ${es.reduce((a,e)=>a+e.sets.filter(s=>s.reps!==null).length,0)} series registradas`;$('cards').innerHTML=es.length?es.map((e,i)=>{planOf(e);const base=e.sets[0]?.kg??(e.unilateral?planOf(e).sets[0]?.kg:null)??null;const rirs=e.sets.flatMap(s=>e.unilateral?[s.sides?.left?.rir,s.sides?.right?.rir]:[s.rir]).filter(v=>v!==null&&v!==undefined);const rir=rirs.length?rirs.reduce((a,v)=>rirs.filter(x=>x===v).length>rirs.filter(x=>x===a).length?v:a,rirs[0]):null;return `<details class="card ${completed(e)?'complete':''}" data-id="${escapeHtml(e.id)}"><summary><span class="count">${completed(e)?'✓':i+1}</span><div class="title"><b>${escapeHtml(e.name)}</b><small>${escapeHtml(summary(e))}</small>${compactDetails(e)}</div><span class="muted">⌄</span></summary><div class="body">${planMarkup(e)}<div class="common-fields"><label>Peso general (kg)<input data-common="kg" type="number" min="0" max="1000" step="any" inputmode="decimal" placeholder="Ej. 60" value="${base??''}"></label><label>${effortLabel()} general<input data-common="rir" type="number" ${effortRange()} step="0.5" inputmode="decimal" placeholder="${effortScale()==='rpe'?'Ej. 9':'Ej. 1'}" value="${shownEffort(rir)??''}"></label></div><div class="sets-header"><span>Nº</span><span>REPS</span><span></span><span></span></div><div class="setrows">${e.sets.map((set,j)=>setHTML(set,j,base,rir,!!e.unilateral)).join('')}</div><div class="actions"><button type="button" class="button small goal-fill" data-action="fill-goal" title="Completa peso y repeticiones según el objetivo, sin cargar el esfuerzo ni guardar">✓ Cargar objetivo</button><button class="button small" data-action="add-set">+ Serie</button><button class="button small" data-action="history">Historial</button><button class="button small danger" data-action="delete-exercise">Eliminar ejercicio</button></div><label>Notas del ejercicio<textarea data-notes maxlength="5000" placeholder="Cómo te sentiste, cambio de máquina, molestias, técnica…">${escapeHtml(e.notes)}</textarea></label><div class="actions"><button class="button primary small" data-action="save">Guardar registro ✓</button></div><div class="status">${e.updated?'Guardado · '+new Date(e.updated).toLocaleString('es-AR'):'Pendiente de guardar'}</div></div></details>`}).join(''):'<div class="blank">Todavía no hay ejercicios en este día. Tocá «+ Ejercicio» para empezar.</div>'}
+function render(){if($('effortScale'))$('effortScale').value=effortScale();model.weeks.sort((a,b)=>a.number-b.number);$('week').innerHTML=model.weeks.map(w=>`<option value="${w.number}">Semana ${w.number}</option>`).join('');$('week').value=currentWeek;$('bigWeek').textContent=String(currentWeek).padStart(2,'0');$('days').innerHTML=week().days.map(d=>`<button class="day ${d.number===currentDay?'active':''}" data-day="${d.number}"><b>${escapeHtml(d.name||'Día '+d.number)}</b><small>${d.exercises.filter(completed).length}/${d.exercises.length} completos</small></button>`).join('');$('dayTitle').textContent=day().name||'Día '+currentDay;const es=day().exercises;$('progress').style.width=(es.length?100*es.filter(completed).length/es.length:0)+'%';$('summary').textContent=`${es.filter(completed).length} de ${es.length} ejercicios · ${es.reduce((a,e)=>a+e.sets.filter(s=>s.reps!==null).length,0)} series registradas`;$('cards').innerHTML=es.length?es.map((e,i)=>{planOf(e);const base=e.sets[0]?.kg??(e.unilateral?planOf(e).sets[0]?.kg:null)??null;const rirs=e.sets.flatMap(s=>e.unilateral?[s.sides?.left?.rir,s.sides?.right?.rir]:[s.rir]).filter(v=>v!==null&&v!==undefined);const rir=rirs.length?rirs.reduce((a,v)=>rirs.filter(x=>x===v).length>rirs.filter(x=>x===a).length?v:a,rirs[0]):null;return `<details class="card ${completed(e)?'complete':''}" data-id="${escapeHtml(e.id)}"><summary><span class="count">${completed(e)?'✓':i+1}</span><div class="title"><b>${escapeHtml(e.name)}</b><small>${escapeHtml(summary(e))}</small>${compactDetails(e)}</div><span class="muted">⌄</span></summary><div class="body">${planMarkup(e)}<div class="common-fields"><label>Peso general (kg)<input data-common="kg" type="number" min="0" max="1000" step="any" inputmode="decimal" placeholder="Ej. 60" value="${base??''}"></label><label>${effortLabel()} general<input data-common="rir" type="number" ${effortRange()} step="0.5" inputmode="decimal" placeholder="${effortScale()==='rpe'?'Ej. 9':'Ej. 1'}" value="${shownEffort(rir)??''}"></label></div>${e.unilateral?'<p class="unilateral-tip">Completá una sola vez las reps por serie: se registran para izquierda y derecha. Solo tocá «Cambiar un lado» si fueron diferentes.</p>':''}<div class="sets-header"><span>Nº</span><span>REPS</span><span></span><span></span></div><div class="setrows">${e.sets.map((set,j)=>setHTML(set,j,base,rir,!!e.unilateral)).join('')}</div><div class="actions"><button type="button" class="button small goal-fill" data-action="fill-goal" title="Completa peso y repeticiones según el objetivo, sin cargar el esfuerzo ni guardar">✓ Cargar objetivo</button><button class="button small" data-action="add-set">+ Serie</button><button class="button small" data-action="history">Historial</button><button class="button small danger" data-action="delete-exercise">Eliminar ejercicio</button></div><label>Notas del ejercicio<textarea data-notes maxlength="5000" placeholder="Cómo te sentiste, cambio de máquina, molestias, técnica…">${escapeHtml(e.notes)}</textarea></label><div class="actions"><button class="button primary small" data-action="save">Guardar registro ✓</button></div><div class="status">${e.updated?'Guardado · '+new Date(e.updated).toLocaleString('es-AR'):'Pendiente de guardar'}</div></div></details>`}).join(''):'<div class="blank">Todavía no hay ejercicios en este día. Tocá «+ Ejercicio» para empezar.</div>'}
 function setHTML(s,j,base,baseRir=null,unilateral=false){
  if(unilateral){
   const l=s.sides?.left||{},r=s.sides?.right||{};
@@ -191,11 +199,12 @@ function setHTML(s,j,base,baseRir=null,unilateral=false){
     overrides[side][key]=changed?value:null;
    }
   }
+  const preferredSide=['left','right'].find(side=>['reps','kg','rir'].some(key=>overrides[side][key]!=null))||'left';
   const sideUI=side=>{
    const title=side==='left'?'Izquierda':'Derecha',x=overrides[side];
-   return `<div class="side-exception"><b>${title}</b><div class="side-exception-fields"><label>Reps<input data-side="${side}" data-field="reps" type="number" min="0" max="200" inputmode="numeric" placeholder="Igual" value="${escapeHtml(inputNumber(x.reps))}"></label><label>kg<input data-side="${side}" data-field="kg" type="number" min="0" max="1000" step="any" inputmode="decimal" placeholder="Igual" value="${escapeHtml(inputNumber(x.kg))}"></label><label>${effortLabel()}<input data-side="${side}" data-field="rir" type="number" ${effortRange()} step="0.5" inputmode="decimal" placeholder="Igual" value="${escapeHtml(inputNumber(shownEffort(x.rir)))}"></label></div></div>`;
+   return `<div class="side-exception ${side!==preferredSide?'hidden':''}" data-editor-side="${side}"><b>Solo ${title.toLowerCase()}</b><div class="side-exception-fields"><label>Reps<input data-side="${side}" data-field="reps" type="number" min="0" max="200" inputmode="numeric" placeholder="Igual" value="${escapeHtml(inputNumber(x.reps))}"></label><label>kg<input data-side="${side}" data-field="kg" type="number" min="0" max="1000" step="any" inputmode="decimal" placeholder="Igual" value="${escapeHtml(inputNumber(x.kg))}"></label><label>${effortLabel()}<input data-side="${side}" data-field="rir" type="number" ${effortRange()} step="0.5" inputmode="decimal" placeholder="Igual" value="${escapeHtml(inputNumber(shownEffort(x.rir)))}"></label></div></div>`;
   };
-  return `<div class="set-row unilateral-set-row compact-unilateral"><span class="set-number">${j+1}</span><input data-prop="reps" type="number" min="0" max="200" inputmode="numeric" placeholder="Reps ambos lados" value="${escapeHtml(inputNumber(commonReps))}" aria-label="Serie ${j+1}, repeticiones para ambos lados"><button type="button" class="adjust-btn sides-toggle ${hasDifference?'changed':''}" data-action="toggle-side-difference" aria-expanded="${hasDifference}">${hasDifference?'≠ Lados distintos':'≠ Diferencia'}</button><button class="remove" data-action="remove-set" data-index="${j}" aria-label="Quitar serie">×</button><div class="side-exception-panel ${hasDifference?'':'hidden'}"><p>Solo completá el valor que cambió; lo demás utiliza las reps de la serie, el peso y el esfuerzo generales.</p>${sideUI('left')}${sideUI('right')}</div></div>`;
+  return `<div class="set-row unilateral-set-row compact-unilateral"><span class="set-number">${j+1}</span><input data-prop="reps" type="number" min="0" max="200" inputmode="numeric" placeholder="Reps ambos lados" value="${escapeHtml(inputNumber(commonReps))}" aria-label="Serie ${j+1}, repeticiones para ambos lados"><button type="button" class="adjust-btn sides-toggle ${hasDifference?'changed':''}" data-action="toggle-side-difference" aria-expanded="${hasDifference}">${hasDifference?'✓ Lado ajustado':'Cambiar un lado'}</button><button class="remove" data-action="remove-set" data-index="${j}" aria-label="Quitar serie">×</button><div class="side-exception-panel ${hasDifference?'':'hidden'}"><p>¿Qué lado fue diferente? Tocá el lado y cambiá solamente el dato distinto. El otro mantiene los valores generales.</p><div class="side-chooser"><button type="button" data-action="choose-side" data-choice="left" aria-pressed="${preferredSide==='left'}">Izquierda</button><button type="button" data-action="choose-side" data-choice="right" aria-pressed="${preferredSide==='right'}">Derecha</button></div>${sideUI('left')}${sideUI('right')}</div></div>`;
  }
  const override=s.kg!==null&&base!==null&&s.kg!==base;
  const overrideRir=s.rir!==null&&baseRir!==null&&s.rir!==baseRir;
@@ -272,17 +281,38 @@ $('cards').addEventListener('input',ev=>{
  if(!ev.target.closest('.plan-edit'))c.dataset.workoutDirty='1';
  draftBadge(c);
 });
-$('cards').addEventListener('click',async ev=>{const b=ev.target.closest('[data-action]');if(!b)return;const c=b.closest('.card'),e=exerciseFrom(c),a=b.dataset.action;try{if(a==='toggle-side-difference'||a==='toggle-plan-sides'){
+$('cards').addEventListener('click',async ev=>{const b=ev.target.closest('[data-action]');if(!b)return;const c=b.closest('.card'),e=exerciseFrom(c),a=b.dataset.action;try{
+ if(a==='configure-increment'){
+  const editor=c.querySelector('.plan-edit');editor.classList.remove('hidden');
+  const field=editor.querySelector('[data-plan="increment"]');
+  field.scrollIntoView({block:'center',behavior:'smooth'});field.focus();
+  return;
+ }
+ if(a==='quick-increment'){
+  const field=c.querySelector('[data-plan="increment"]');
+  field.value=b.dataset.value;
+  c.querySelectorAll('.increment-presets button').forEach(x=>x.classList.toggle('selected',x===b));
+  draftBadge(c);
+  return;
+ }
+ if(a==='choose-side'){
+  const panel=b.closest('.side-exception-panel,.plan-side-targets');
+  const choice=b.dataset.choice;
+  panel.querySelectorAll('[data-editor-side]').forEach(x=>x.classList.toggle('hidden',x.dataset.editorSide!==choice));
+  panel.querySelectorAll('[data-action="choose-side"]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.choice===choice)));
+  return;
+ }
+ if(a==='toggle-side-difference'||a==='toggle-plan-sides'){
  const planMode=a==='toggle-plan-sides', row=b.closest(planMode?'[data-plan-series-row]':'.set-row');
  const panel=row.querySelector(planMode?'.plan-side-targets':'.side-exception-panel');
  const opening=panel.classList.contains('hidden');
  if(!opening){
   const hasOverrides=[...panel.querySelectorAll('input')].some(input=>input.value.trim()!=='');
-  if(hasOverrides&&!confirm('Hay valores distintos para izquierda/derecha. ¿Igualar ambos lados y borrar esas diferencias de esta serie?'))return;
+  if(hasOverrides&&!confirm('Esta serie tiene valores diferentes. ¿Volver a registrar lo mismo en ambos lados y eliminar esos ajustes?'))return;
   panel.querySelectorAll('input').forEach(input=>input.value='');
  }
  panel.classList.toggle('hidden',!opening);b.setAttribute('aria-expanded',String(opening));
- b.textContent=opening?'≠ Lados distintos':'≠ Diferencia'+(planMode?' entre lados':'');
+ b.textContent=opening?(planMode?'✓ Objetivo distinto por lado':'✓ Lado ajustado'):(planMode?'¿Objetivo distinto en un lado?':'Cambiar un lado');
  b.classList.toggle('changed',opening);
  if(!planMode){c.dataset.workoutDirty='1';draftBadge(c)}else draftBadge(c);
  return;
@@ -365,8 +395,22 @@ if(a==='save-plan'){
  if(!sets.length||sets.length>30||!Number.isInteger(min)||min<1||!Number.isInteger(max)||max<min||max>200||!Number.isFinite(rir)||rir<0||rir>10||increment!==null&&(!Number.isFinite(increment)||increment<=0)||sets.some(x=>x.reps!==null&&(!Number.isInteger(x.reps)||x.reps<1||x.reps>200)||x.kg!==null&&(!Number.isFinite(x.kg)||x.kg<0||x.kg>1000)))throw Error('Revisá la planificación.');
  const wasUnilateral=!!e.unilateral, nowUnilateral=c.querySelector('[data-plan="unilateral"]').checked;
   if(wasUnilateral!==nowUnilateral&&e.updated&&!confirm('Cambiar bilateral/unilateral en un ejercicio guardado requiere revisar y registrar nuevamente los datos por lado. Se conservarán los valores hasta que guardes de nuevo. ¿Continuar?'))return;
+  const previousPlan=planOf(e);
+  const wasWeightReview=!!previousPlan.requiresWeightReview || /revisar carga/i.test(previousPlan.reason||'');
   e.unilateral=nowUnilateral;
-  e.plan={sets,min,max,rir,increment,volumeEnabled:c.querySelector('[data-plan="volumeEnabled"]').checked,volumeCandidate:false,reason:'Objetivo personalizado'};
+  const volumeEnabled=c.querySelector('[data-plan="volumeEnabled"]').checked;
+  e.plan={sets,min,max,rir,increment,volumeEnabled,volumeCandidate:false,reason:'Objetivo personalizado'};
+  const prev=wasWeightReview&&!e.updated&&increment!==null?previousExercise(e):null;
+  if(prev?.exercise.updated&&confirm('Esta semana esperaba que configuraras el aumento de peso. ¿Querés recalcular AHORA el objetivo usando los resultados reales de la semana anterior?\n\nSe reemplazará la propuesta actual de este ejercicio, sin modificar lo registrado anteriormente.')){
+   const basis=JSON.parse(JSON.stringify(prev.exercise));
+   basis.plan={...basis.plan,increment,min,max,rir,volumeEnabled};
+   const suggested=ObsidianaProgression.propose(basis,'auto');
+   if(!suggested.requiresReview&&!suggested.requiresWeightReview){
+    e.plan={...suggested,increment,volumeEnabled};
+   }else{
+    alert('Todavía no se puede proponer un aumento automático. '+(suggested.reason||'Revisá el rendimiento anterior.'));
+   }
+  }
  await persist();render();
  const card=[...document.querySelectorAll('.card')].find(el=>el.dataset.id===e.id);
  if(card)card.open=true;
