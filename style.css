@@ -346,3 +346,29 @@ input::placeholder,textarea::placeholder{color:#85909E}
 @media(min-width:761px){
  .toolbar.obs-nav-ready+.daytools{display:none!important}
 }
+
+/* Videos de técnica y exportación PDF. */
+.plan-tools{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:7px}
+.obs-video-open{border-color:#4B846F!important;color:#90D9C4!important}
+.pdf-export-dialog{display:flex;gap:10px;flex-wrap:wrap;margin:15px 0}
+.pdf-export-dialog button{min-height:44px}
+@media(max-width:600px){.plan-tools{justify-content:flex-start}.pdf-export-dialog button{flex:1 1 130px}}
+
+/* Gestión explícita de cuentas vinculadas */
+.obs-account-actions{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 4px}
+.obs-link-manage{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;padding:13px 0;border-bottom:1px solid #353944}
+.obs-link-manage small{display:block;margin-top:5px;color:#B6BAC5}
+.obs-link-buttons{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+@media(max-width:600px){.obs-account-actions button,.obs-link-buttons button{flex:1 0 auto;min-height:42px}}
+
+/* Obsidiana: invitaciones específicas por alumno. */
+.obs-student-online{background:#151a21;border:1px solid #363d48;border-radius:11px;padding:11px;margin:10px 0 13px;display:grid;gap:9px}
+.obs-connection-status{font-size:12px;color:#bcc6d3;line-height:1.45;overflow-wrap:anywhere}
+.obs-connection-status strong{color:#d4b4ff}
+.obs-connection-status.is-linked{color:#61d4bd}
+.obs-connection-status.is-pending{color:#e8c67f}
+.obs-connection-actions{display:flex;flex-wrap:wrap;gap:7px}
+.obs-connection-actions .button{font-size:12px;min-height:38px}
+.obs-invitation-detail{display:grid;gap:10px;padding:14px;margin:12px 0;border:1px solid #393f4b;border-radius:12px;background:#1d222b}
+.obs-invitation-detail .link-code{overflow-wrap:anywhere}
+@media(max-width:600px){.obs-connection-actions .button{flex:1;white-space:normal}.obs-student-online{padding:10px}}

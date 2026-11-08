@@ -4,14 +4,65 @@ const $=id=>document.getElementById(id);
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function sb(){if(!window.obsidianaSupabase)throw Error('Esperá a que se inicie la conexión con Google.');return window.obsidianaSupabase;}
 async function current(){const {data,error}=await sb().auth.getUser();if(error)throw error;if(!data?.user)throw Error('Iniciá sesión con Google primero.');return data.user;}
-async function links(){const me=await current();const {data,error}=await sb().from('coach_students').select('id,coach_id,student_id,status,created_at').eq('status','accepted').or(`coach_id.eq.${me.id},student_id.eq.${me.id}`).order('created_at',{ascending:false});if(error)throw error;return {me,list:data||[]};}
+async function links(){
+ const me=await current();
+ const {data,error}=await sb().from('coach_students').select('id,coach_id,student_id,status,created_at').eq('status','accepted').or(`coach_id.eq.${me.id},student_id.eq.${me.id}`).order('created_at',{ascending:false});
+ if(error)throw error;
+ let people=[];
+ try{const reply=await sb().rpc('obsidiana_linked_accounts');if(!reply.error)people=reply.data||[];
+ else console.warn('Obsidiana: falta función de nombres en Supabase',reply.error.message);
+ }catch(err){console.warn('Sin nombres de Supabase:',err)}
+ const byLink=new Map(people.map(p=>[p.link_id,p]));
+ const list=(data||[]).map(x=>({...x,linkedDisplay:byLink.get(x.id)?.display_name||''}));
+ return {me,list};
+}
+function localLabel(me,x,index){
+ const student=x.coach_id===me.id && Array.isArray(model?.coachStudents)
+   ? model.coachStudents.find(s=>s.onlineLinkId===x.id) : null;
+ if(student?.name)return student.name;
+ const alias=model?.linkedAliases?.[me.id+':'+x.id];
+ const label=String(alias||x.linkedDisplay||'').trim();
+ if(label && label!=='Cuenta vinculada')return label;
+ return (x.coach_id===me.id?'Alumno':'Entrenador')+' '+(index+1)+' (asigná un nombre)';
+}
+
 function popup(title,markup){$('modalTitle').textContent=title;$('modalBody').innerHTML=markup;$('overlay').classList.add('open');}
 async function send(){try{
  if(typeof window.obsidianaReady?.then==='function')await window.obsidianaReady;
- const {me,list}=await links();if(!list.length)throw Error('Todavía no hay una vinculación aceptada.');
- const options=list.map((x,i)=>`<option value="${i}">${x.coach_id===me.id?'Alumno':'Entrenador'} · ${escape(x.id.slice(0,8))}</option>`).join('');
- popup('Compartir con cuenta vinculada',`<p>El envío llegará a la bandeja de la otra persona, sin enlaces.</p><label>Cuenta vinculada<select id="obsRecipient">${options}</select></label><label>Qué enviar<select id="obsSendScope"><option value="day">Entrenamiento actual</option><option value="week">Semana actual</option></select></label><p class="muted">Solo se envía la planificación o el resultado que confirmes. No se sincroniza tu historial personal.</p><button type="button" class="button primary" id="obsConfirmRemote">Enviar ahora</button><p id="obsRemoteFeedback" class="muted" role="status"></p>`);
- $('obsConfirmRemote').onclick=async()=>{const button=$('obsConfirmRemote'),msg=$('obsRemoteFeedback');button.disabled=true;msg.textContent='Enviando…';try{
+ const {me,list:all}=await links();
+ let list=all;
+ const active=typeof activeWorkspace==='function'?activeWorkspace():'';
+ if(active){
+  const student=(model.coachStudents||[]).find(s=>s.name===active);
+  list=all.filter(x=>x.coach_id===me.id && student?.onlineLinkId===x.id);
+  if(!list.length){popup('Compartir con cuenta','<p>«'+escape(active)+'» todavía no tiene una cuenta vinculada asociada a su ficha. Entrá en «Mis alumnos» y generá la invitación desde su perfil o asigná la vinculación existente.</p>');return;}
+ }else{
+  list=all.filter(x=>x.student_id===me.id);
+  if(!list.length){popup('Compartir con cuenta',all.some(x=>x.coach_id===me.id)?'<p>Para enviar una planificación, primero abrí la rutina del alumno desde «Mis alumnos». Así Obsidiana elige la cuenta correcta automáticamente.</p>':'<p>No hay cuentas vinculadas activas. Las invitaciones se generan desde la ficha de cada alumno.</p>');return;}
+ }
+ const options=list.map((x,i)=>`<option value="${i}">${escape(localLabel(me,x,i))}</option>`).join('');
+ popup('Compartir con cuenta vinculada',`<p>El envío llegará a la bandeja de la otra persona, sin enlaces.</p>${active?`<p class="sub">Ficha activa: <strong>${escape(active)}</strong> · destinatario vinculado automáticamente.</p>`:``}<label>Cuenta vinculada<select id="obsRecipient">${options}</select></label><div class="obs-account-actions"><button type="button" class="button small" id="obsRenameRecipient">✎ Cambiar nombre</button><button type="button" class="button small danger" id="obsUnlinkRecipient">Desvincular cuenta</button></div><p class="muted" style="font-size:11px">El nombre es solo una etiqueta para reconocer tus cuentas vinculadas. No cambia la cuenta ni la vinculación.</p><label>Qué enviar<select id="obsSendScope"><option value="day">Entrenamiento actual</option><option value="week">Semana actual</option></select></label><p class="muted">Solo se envía la planificación o el resultado que confirmes. No se sincroniza tu historial personal.</p><button type="button" class="button primary" id="obsConfirmRemote">Enviar ahora</button><p id="obsRemoteFeedback" class="muted" role="status"></p>`);
+ $('obsRenameRecipient').onclick=async()=>{
+ const select=$('obsRecipient');const i=Number(select.value),x=list[i];if(!x)return;
+ const current=localLabel(me,x,i);
+ const value=prompt('Nombre para identificar esta cuenta vinculada:',current);
+ if(value===null)return;
+ const name=value.trim();if(!name||name.length>80){alert('Ingresá un nombre de hasta 80 caracteres.');return;}
+ model.linkedAliases??={};model.linkedAliases[me.id+':'+x.id]=name;
+ try{await persist();select.options[i].textContent=name;}catch(err){alert('No se pudo guardar el nombre: '+err.message)}
+};
+$('obsUnlinkRecipient').onclick=async()=>{
+ const idx=Number($('obsRecipient').value),x=list[idx];if(!x)return;
+ const name=localLabel(me,x,idx);
+ if(!confirm('¿Desvincular a «'+name+'»?\n\nDejará de aparecer como destinatario para compartir rutinas y resultados. Sus registros guardados en los dispositivos no se borran. Para volver a conectarse necesitarán otra invitación.'))return;
+ const button=$('obsUnlinkRecipient');button.disabled=true;
+ try{const {data,error}=await sb().rpc('obsidiana_unlink_account',{p_link_id:x.id});if(error)throw error;
+   if(data!==true)throw Error('No se pudo confirmar la desvinculación.');
+   if(model?.linkedAliases){delete model.linkedAliases[me.id+':'+x.id];await persist();}
+   await send();
+ }catch(e){alert('No se pudo desvincular: '+(e.message||e));button.disabled=false;}
+};
+$('obsConfirmRemote').onclick=async()=>{const button=$('obsConfirmRemote'),msg=$('obsRemoteFeedback');button.disabled=true;msg.textContent='Enviando…';try{
   if(typeof guardDirty==='function'&&!guardDirty())throw Error('Primero guardá los cambios pendientes.');
   const x=list[Number($('obsRecipient').value)],scope=$('obsSendScope').value;
   const coach=me.id===x.coach_id,kind=coach?'plan':'results';
@@ -44,5 +95,5 @@ function setup(){
  }else toolbar.append(sendBtn,inboxBtn);
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',setup);else setup();
-window.obsidianaConnected={send,inbox};
+window.obsidianaConnected={send,inbox,links,localLabel};
 })();

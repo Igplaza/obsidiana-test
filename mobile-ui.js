@@ -32,7 +32,7 @@
   const groups = [
     ['Planificación', ['autoWeek', 'addWeek', 'deloadWeek']],
     ['Compartir y alumnos', ['shareToggle', 'coachPanel', 'studentLink']],
-    ['Historial y respaldo', ['evolution', 'export', 'import']],
+    ['Historial y respaldo', ['evolution', 'pdfExport', 'export', 'import']],
     ['Organizar días', ['addDay', 'renameDay', 'moveDayUp', 'moveDayDown', 'deleteMenuToggle']]
   ];
   for (const [title, ids] of groups) {
