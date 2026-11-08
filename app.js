@@ -87,13 +87,23 @@ function openWeekComparison(e){
 }
 
 function planSetMarkup(x,i){
- const sideFields=side=>{const name=side==='left'?'Izquierda':'Derecha',data=x.sides?.[side]||{};return `<div class="plan-side-target"><b>${name}</b><input data-plan-side="${side}-reps" type="number" min="1" max="200" placeholder="Reps base" inputmode="numeric" aria-label="${name}, repeticiones objetivo serie ${i+1}" value="${escapeHtml(inputNumber(data.reps))}"><input data-plan-side="${side}-kg" type="number" min="0" max="1000" step="any" inputmode="decimal" placeholder="Kg base" aria-label="${name}, peso objetivo serie ${i+1}" value="${escapeHtml(inputNumber(data.kg))}"></div>`};
+ const baseR=x.reps??null,baseK=x.kg??null;
+ const overrideValue=(side,key)=>{
+  const xval=x.sides?.[side]?.[key];
+  return xval!=null&&Number(xval)!==Number(key==='kg'?baseK:baseR)?xval:null;
+ };
+ const hasDifference=['left','right'].some(side=>['reps','kg'].some(key=>overrideValue(side,key)!==null));
+ const sideUI=side=>{
+  const name=side==='left'?'Izquierda':'Derecha';
+  return `<div class="plan-side-target"><b>${name}</b><label>Reps<input data-plan-side="${side}-reps" type="number" min="1" max="200" inputmode="numeric" placeholder="Igual" value="${escapeHtml(inputNumber(overrideValue(side,'reps')))}" aria-label="${name}: repeticiones diferentes"></label><label>kg<input data-plan-side="${side}-kg" type="number" min="0" max="1000" step="any" inputmode="decimal" placeholder="Igual" value="${escapeHtml(inputNumber(overrideValue(side,'kg')))}" aria-label="${name}: peso diferente"></label></div>`;
+ };
  return `<div class="plan-set-row" data-plan-series-row>
    <span class="plan-set-label">S${i+1}</span>
-   <input data-plan-reps="${i}" type="number" min="1" max="200" step="1" inputmode="numeric" placeholder="Reps" aria-label="Repeticiones objetivo serie ${i+1}" value="${escapeHtml(inputNumber(x.reps))}">
-   <input data-plan-kg="${i}" type="number" min="0" max="1000" step="any" inputmode="decimal" placeholder="kg" aria-label="Peso objetivo serie ${i+1}" value="${escapeHtml(inputNumber(x.kg))}">
+   <input data-plan-reps="${i}" type="number" min="1" max="200" step="1" inputmode="numeric" placeholder="Reps" aria-label="Repeticiones objetivo serie ${i+1}" value="${escapeHtml(inputNumber(baseR))}">
+   <input data-plan-kg="${i}" type="number" min="0" max="1000" step="any" inputmode="decimal" placeholder="kg" aria-label="Peso objetivo serie ${i+1}" value="${escapeHtml(inputNumber(baseK))}">
    <button type="button" class="plan-remove-set" data-action="remove-plan-set" title="Quitar serie del objetivo" aria-label="Quitar serie ${i+1} del objetivo">×</button>
-   <div class="plan-side-targets">${sideFields("left")}${sideFields("right")}</div>
+   <div class="plan-side-controls"><button type="button" class="button small sides-toggle ${hasDifference?'changed':''}" data-action="toggle-plan-sides" aria-expanded="${hasDifference}">${hasDifference?'≠ Lados distintos':'≠ Diferencia entre lados'}</button><small>${hasDifference?'Objetivo por lado':'Ambos lados iguales por defecto'}</small></div>
+   <div class="plan-side-targets ${hasDifference?'':'hidden'}">${sideUI('left')}${sideUI('right')}<span class="side-fallback-hint">Dejá vacío lo que sea igual al objetivo general.</span></div>
  </div>`;
 }
 function renumberPlanRows(c){
@@ -122,7 +132,7 @@ function planMarkup(e){
     <label class="plan-general-weight">Peso para todas las series (kg)
      <input data-plan="all-kg" type="number" min="0" max="1000" step="any" inputmode="decimal" placeholder="Ej. 66" value="${sameKg?inputNumber(p.sets[0].kg):''}">
     </label>
-    <p class="plan-help">Se completa en todas las series. Después podés modificar el peso de cualquiera por separado.</p><p class="plan-help">Si es unilateral, los campos por lado son opcionales: vacíos usan el objetivo general.</p>
+    <p class="plan-help">Se completa en todas las series. Si un lado necesita otro peso o repeticiones, tocá «≠ Diferencia entre lados» en esa serie.</p>
     <div class="plan-series-heading"><span></span><span>REPS</span><span>KG</span><span></span></div>
     <div class="plan-series-list">${p.sets.map(planSetMarkup).join('')}</div>
     <div class="plan-series-actions">
@@ -163,13 +173,30 @@ function seriesDetail(e){
 function render(){if($('effortScale'))$('effortScale').value=effortScale();model.weeks.sort((a,b)=>a.number-b.number);$('week').innerHTML=model.weeks.map(w=>`<option value="${w.number}">Semana ${w.number}</option>`).join('');$('week').value=currentWeek;$('bigWeek').textContent=String(currentWeek).padStart(2,'0');$('days').innerHTML=week().days.map(d=>`<button class="day ${d.number===currentDay?'active':''}" data-day="${d.number}"><b>${escapeHtml(d.name||'Día '+d.number)}</b><small>${d.exercises.filter(completed).length}/${d.exercises.length} completos</small></button>`).join('');$('dayTitle').textContent=day().name||'Día '+currentDay;const es=day().exercises;$('progress').style.width=(es.length?100*es.filter(completed).length/es.length:0)+'%';$('summary').textContent=`${es.filter(completed).length} de ${es.length} ejercicios · ${es.reduce((a,e)=>a+e.sets.filter(s=>s.reps!==null).length,0)} series registradas`;$('cards').innerHTML=es.length?es.map((e,i)=>{planOf(e);const base=e.sets[0]?.kg??(e.unilateral?planOf(e).sets[0]?.kg:null)??null;const rirs=e.sets.flatMap(s=>e.unilateral?[s.sides?.left?.rir,s.sides?.right?.rir]:[s.rir]).filter(v=>v!==null&&v!==undefined);const rir=rirs.length?rirs.reduce((a,v)=>rirs.filter(x=>x===v).length>rirs.filter(x=>x===a).length?v:a,rirs[0]):null;return `<details class="card ${completed(e)?'complete':''}" data-id="${escapeHtml(e.id)}"><summary><span class="count">${completed(e)?'✓':i+1}</span><div class="title"><b>${escapeHtml(e.name)}</b><small>${escapeHtml(summary(e))}</small>${compactDetails(e)}</div><span class="muted">⌄</span></summary><div class="body">${planMarkup(e)}<div class="common-fields"><label>Peso general (kg)<input data-common="kg" type="number" min="0" max="1000" step="any" inputmode="decimal" placeholder="Ej. 60" value="${base??''}"></label><label>${effortLabel()} general<input data-common="rir" type="number" ${effortRange()} step="0.5" inputmode="decimal" placeholder="${effortScale()==='rpe'?'Ej. 9':'Ej. 1'}" value="${shownEffort(rir)??''}"></label></div><div class="sets-header"><span>Nº</span><span>REPS</span><span></span><span></span></div><div class="setrows">${e.sets.map((set,j)=>setHTML(set,j,base,rir,!!e.unilateral)).join('')}</div><div class="actions"><button type="button" class="button small goal-fill" data-action="fill-goal" title="Completa peso y repeticiones según el objetivo, sin cargar el esfuerzo ni guardar">✓ Cargar objetivo</button><button class="button small" data-action="add-set">+ Serie</button><button class="button small" data-action="history">Historial</button><button class="button small danger" data-action="delete-exercise">Eliminar ejercicio</button></div><label>Notas del ejercicio<textarea data-notes maxlength="5000" placeholder="Cómo te sentiste, cambio de máquina, molestias, técnica…">${escapeHtml(e.notes)}</textarea></label><div class="actions"><button class="button primary small" data-action="save">Guardar registro ✓</button></div><div class="status">${e.updated?'Guardado · '+new Date(e.updated).toLocaleString('es-AR'):'Pendiente de guardar'}</div></div></details>`}).join(''):'<div class="blank">Todavía no hay ejercicios en este día. Tocá «+ Ejercicio» para empezar.</div>'}
 function setHTML(s,j,base,baseRir=null,unilateral=false){
  if(unilateral){
-  const sideUI=side=>{const label=side==='left'?'Izquierda':'Derecha';const x=s.sides?.[side]||{};
-   const kg=x.kg??null, rir=x.rir??null;
-   return `<div class="unilateral-side"><b>${label}</b><label>Reps<input data-side="${side}" data-field="reps" type="number" min="0" max="200" inputmode="numeric" placeholder="Reps" value="${escapeHtml(inputNumber(x.reps))}"></label><label>kg<input data-side="${side}" data-field="kg" type="number" min="0" max="1000" step="any" inputmode="decimal" placeholder="General" value="${kg!==null&&kg!==base?escapeHtml(kg):''}"></label><label>${effortLabel()}<input data-side="${side}" data-field="rir" type="number" ${effortRange()} step="0.5" inputmode="decimal" placeholder="General" value="${rir!==null&&rir!==baseRir?escapeHtml(shownEffort(rir)):''}"></label></div>`;
+  const l=s.sides?.left||{},r=s.sides?.right||{};
+  // El registro se carga como una serie común. Sólo desdoblamos si hay diferencias reales.
+  const commonReps=s.reps??l.reps??r.reps??null;
+  const baseKg=base??s.kg??l.kg??r.kg??null;
+  const commonEffort=baseRir??s.rir??l.rir??r.rir??null;
+  const overrides={};
+  let hasDifference=false;
+  for(const side of ['left','right']){
+   const x=side==='left'?l:r;
+   overrides[side]={};
+   for(const key of ['reps','kg','rir']){
+    const fallback=key==='reps'?commonReps:key==='kg'?baseKg:commonEffort;
+    const value=x[key];
+    const changed=value!==null&&value!==undefined&&Number(value)!==Number(fallback);
+    if(changed)hasDifference=true;
+    overrides[side][key]=changed?value:null;
+   }
+  }
+  const sideUI=side=>{
+   const title=side==='left'?'Izquierda':'Derecha',x=overrides[side];
+   return `<div class="side-exception"><b>${title}</b><div class="side-exception-fields"><label>Reps<input data-side="${side}" data-field="reps" type="number" min="0" max="200" inputmode="numeric" placeholder="Igual" value="${escapeHtml(inputNumber(x.reps))}"></label><label>kg<input data-side="${side}" data-field="kg" type="number" min="0" max="1000" step="any" inputmode="decimal" placeholder="Igual" value="${escapeHtml(inputNumber(x.kg))}"></label><label>${effortLabel()}<input data-side="${side}" data-field="rir" type="number" ${effortRange()} step="0.5" inputmode="decimal" placeholder="Igual" value="${escapeHtml(inputNumber(shownEffort(x.rir)))}"></label></div></div>`;
   };
-  return `<div class="set-row unilateral-set-row"><span class="set-number">${j+1}</span><div class="unilateral-pair">${sideUI('left')}${sideUI('right')}</div><button class="remove" data-action="remove-set" data-index="${j}" aria-label="Quitar serie">×</button></div>`;
+  return `<div class="set-row unilateral-set-row compact-unilateral"><span class="set-number">${j+1}</span><input data-prop="reps" type="number" min="0" max="200" inputmode="numeric" placeholder="Reps ambos lados" value="${escapeHtml(inputNumber(commonReps))}" aria-label="Serie ${j+1}, repeticiones para ambos lados"><button type="button" class="adjust-btn sides-toggle ${hasDifference?'changed':''}" data-action="toggle-side-difference" aria-expanded="${hasDifference}">${hasDifference?'≠ Lados distintos':'≠ Diferencia'}</button><button class="remove" data-action="remove-set" data-index="${j}" aria-label="Quitar serie">×</button><div class="side-exception-panel ${hasDifference?'':'hidden'}"><p>Solo completá el valor que cambió; lo demás utiliza las reps de la serie, el peso y el esfuerzo generales.</p>${sideUI('left')}${sideUI('right')}</div></div>`;
  }
-
  const override=s.kg!==null&&base!==null&&s.kg!==base;
  const overrideRir=s.rir!==null&&baseRir!==null&&s.rir!==baseRir;
  const expanded=override||overrideRir;
@@ -190,16 +217,20 @@ function readCard(el){
  const unilateral=!!exerciseFrom(el)?.unilateral;
  const sets=rows.map(row=>{
   if(unilateral){
+   const repsInput=row.querySelector('[data-prop="reps"]');
+   if(!repsInput.checkValidity())throw Error('Revisá las repeticiones de la serie.');
+   const commonReps=repsInput.value.trim()===''?null:Number(repsInput.value);
+   if(commonReps!==null&&!Number.isInteger(commonReps))throw Error('Las repeticiones deben ser enteras.');
    const sides={};
    for(const side of ['left','right']){
     const find=key=>row.querySelector(`[data-side="${side}"][data-field="${key}"]`);
-    const repsEl=find('reps'),kgEl=find('kg'),rirEl=find('rir');
-    if(!repsEl.checkValidity()||!kgEl.checkValidity()||!rirEl.checkValidity())throw Error(`Revisá la serie de ${side==='left'?'izquierda':'derecha'}.`);
-    const reps=repsEl.value.trim()===''?null:Number(repsEl.value);
+    const ri=find('reps'),ki=find('kg'),ei=find('rir');
+    if(!ri.checkValidity()||!ki.checkValidity()||!ei.checkValidity())throw Error(`Revisá la serie de ${side==='left'?'izquierda':'derecha'}.`);
+    const reps=ri.value.trim()===''?commonReps:Number(ri.value);
     if(reps!==null&&!Number.isInteger(reps))throw Error('Las repeticiones deben ser enteras.');
-    sides[side]={kg:kgEl.value.trim()===''?kg:Number(kgEl.value),reps,rir:rirEl.value.trim()===''?rir:enteredRir(Number(rirEl.value))};
+    sides[side]={reps,kg:ki.value.trim()===''?kg:Number(ki.value),rir:ei.value.trim()===''?rir:enteredRir(Number(ei.value))};
    }
-   const same=(field)=>sides.left[field]===sides.right[field]?sides.left[field]:null;
+   const same=key=>sides.left[key]===sides.right[key]?sides.left[key]:null;
    return {kg:same('kg'),reps:same('reps'),rir:same('rir'),sides};
   }
   const repsInput=row.querySelector('[data-prop="reps"]');
@@ -241,7 +272,21 @@ $('cards').addEventListener('input',ev=>{
  if(!ev.target.closest('.plan-edit'))c.dataset.workoutDirty='1';
  draftBadge(c);
 });
-$('cards').addEventListener('click',async ev=>{const b=ev.target.closest('[data-action]');if(!b)return;const c=b.closest('.card'),e=exerciseFrom(c),a=b.dataset.action;try{if(a==='toggle-adjust'){const extra=b.closest('.set-row').querySelector('.set-extra');extra.classList.toggle('hidden');b.setAttribute('aria-expanded',String(!extra.classList.contains('hidden')));return}if(a==='toggle-previous'){openWeekComparison(e);return}if(a==='toggle-plan'){c.querySelector('.plan-edit').classList.toggle('hidden');return}if(a==='open-video'){
+$('cards').addEventListener('click',async ev=>{const b=ev.target.closest('[data-action]');if(!b)return;const c=b.closest('.card'),e=exerciseFrom(c),a=b.dataset.action;try{if(a==='toggle-side-difference'||a==='toggle-plan-sides'){
+ const planMode=a==='toggle-plan-sides', row=b.closest(planMode?'[data-plan-series-row]':'.set-row');
+ const panel=row.querySelector(planMode?'.plan-side-targets':'.side-exception-panel');
+ const opening=panel.classList.contains('hidden');
+ if(!opening){
+  const hasOverrides=[...panel.querySelectorAll('input')].some(input=>input.value.trim()!=='');
+  if(hasOverrides&&!confirm('Hay valores distintos para izquierda/derecha. ¿Igualar ambos lados y borrar esas diferencias de esta serie?'))return;
+  panel.querySelectorAll('input').forEach(input=>input.value='');
+ }
+ panel.classList.toggle('hidden',!opening);b.setAttribute('aria-expanded',String(opening));
+ b.textContent=opening?'≠ Lados distintos':'≠ Diferencia'+(planMode?' entre lados':'');
+ b.classList.toggle('changed',opening);
+ if(!planMode){c.dataset.workoutDirty='1';draftBadge(c)}else draftBadge(c);
+ return;
+}if(a==='toggle-adjust'){const extra=b.closest('.set-row').querySelector('.set-extra');extra.classList.toggle('hidden');b.setAttribute('aria-expanded',String(!extra.classList.contains('hidden')));return}if(a==='toggle-previous'){openWeekComparison(e);return}if(a==='toggle-plan'){c.querySelector('.plan-edit').classList.toggle('hidden');return}if(a==='open-video'){
  const url=e.videoUrl;
  if(!url||!/^https:\/\//i.test(url)){alert('El ejercicio no tiene un enlace de video válido.');return;}
  if(typeof window.obsidianaOpenExternal==='function')await window.obsidianaOpenExternal(url);
@@ -265,6 +310,12 @@ if(a==='add-plan-set'||a==='remove-plan-set'){
   if(rows.length>=30){alert('Máximo 30 series en el objetivo.');return}
   const last=rows[rows.length-1];
   const latest=last?{reps:last.querySelector('[data-plan-reps]').value,kg:last.querySelector('[data-plan-kg]').value}:{reps:'',kg:''};
+  if(last&&last.querySelector('.plan-side-targets')&&!last.querySelector('.plan-side-targets').classList.contains('hidden')){
+   latest.sides={};for(const side of ['left','right'])latest.sides[side]={
+    reps:last.querySelector(`[data-plan-side="${side}-reps"]`).value||null,
+    kg:last.querySelector(`[data-plan-side="${side}-kg"]`).value||null
+   };
+  }
   // La nueva serie copia los valores de la última; luego se pueden editar.
   list.insertAdjacentHTML('beforeend',planSetMarkup(latest,rows.length));
  }else{
@@ -297,12 +348,17 @@ if(a==='save-plan'){
   if(!ri.checkValidity()||!ki.checkValidity())throw Error('Revisá las repeticiones y los pesos del objetivo.');
   const general={reps:ri.value.trim()===''?null:Number(ri.value),kg:ki.value.trim()===''?null:Number(ki.value)};
   if(c.querySelector('[data-plan="unilateral"]').checked){
-   general.sides={};
+   const sides={};let any=false;
    for(const side of ['left','right']){
     const rep=row.querySelector(`[data-plan-side="${side}-reps"]`),weight=row.querySelector(`[data-plan-side="${side}-kg"]`);
     if(!rep.checkValidity()||!weight.checkValidity())throw Error('Revisá los objetivos por lado.');
-    general.sides[side]={reps:rep.value.trim()===''?null:Number(rep.value),kg:weight.value.trim()===''?null:Number(weight.value)};
+    const rv=rep.value.trim()===''?null:Number(rep.value),kv=weight.value.trim()===''?null:Number(weight.value);
+    if(rv!==null&&(!Number.isInteger(rv)||rv<1||rv>200))throw Error('Reps objetivo por lado inválidas.');
+    if(kv!==null&&(!Number.isFinite(kv)||kv<0||kv>1000))throw Error('Peso objetivo por lado inválido.');
+    sides[side]={reps:rv!==null&&rv!==general.reps?rv:null,kg:kv!==null&&kv!==general.kg?kv:null};
+    if(sides[side].reps!==null||sides[side].kg!==null)any=true;
    }
+   if(any)general.sides=sides;
   }
   return general;
  });
