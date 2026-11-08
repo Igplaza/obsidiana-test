@@ -1,5 +1,5 @@
 /* Obsidiana | Informes PDF con tarjetas y tablas, sin conexión ni librerías externas.
-   Solo exporta los registros guardados localmente. */
+   Exporta objetivos incluso antes de realizar la sesión, más registros guardados. */
 (function(root){
 'use strict';
 const PW=595.28,PH=841.89,L=38,R=PW-38,W=R-L,BOTTOM=54;
@@ -37,10 +37,17 @@ function wrap(value,maxwidth,size=9,bold=false){
 }
 function buildReport(input){
  if(!input||!Array.isArray(input.days))throw new Error('No hay datos válidos para exportar.');
- const days=input.days.map((d,i)=>({...d,items:(Array.isArray(d.exercises)?d.exercises:[]).filter(e=>e&&e.updated)})).filter(d=>d.items.length);
- if(!days.length)throw new Error('Todavía no hay ejercicios guardados para exportar.');
- let exerciseCount=0,setCount=0,volume=0;
- for(const d of days)for(const e of d.items){exerciseCount++;for(const s of (e.sets||[])){setCount++;if(s.kg!==null&&s.kg!==''&&Number.isFinite(Number(s.kg))&&Number(s.reps)>0)volume+=Number(s.kg)*Number(s.reps)}}
+ const days=input.days.map(d=>({...d,items:(Array.isArray(d.exercises)?d.exercises:[]).filter(e=>e&&(e.plan?.sets?.length||e.updated))})).filter(d=>d.items.length);
+ if(!days.length)throw new Error('No hay ejercicios ni objetivos planificados en el período seleccionado.');
+ let exerciseCount=0,setCount=0,volume=0,plannedCount=0;
+ for(const d of days)for(const e of d.items){
+  exerciseCount++;plannedCount+=(e.plan?.sets||[]).length;
+  if(!e.updated)continue;
+  for(const s of (e.sets||[])){
+   if(s.kg===null||s.kg===undefined||!Number.isFinite(Number(s.kg))||!Number.isFinite(Number(s.reps))||Number(s.reps)<=0)continue;
+   setCount++;volume+=Number(s.kg)*Number(s.reps);
+  }
+ }
  const pages=[];let stream=[],cy=0,daySeq=0;
  function setFill(col){stream.push(rgb(col)+' rg')}
  function setStroke(col){stream.push(rgb(col)+' RG')}
@@ -59,17 +66,23 @@ function buildReport(input){
  function page(){
   stream=[];pages.push(stream);rectangle(0,0,PW,PH,C.white);rectangle(0,PH-103,PW,103,C.dark);rectangle(0,PH-106,PW,3,C.purple);
   drawGem(L,PH-71);txt('O B S I D I A N A',L+29,PH-48,14,true,C.white);txt('INFORME DE ENTRENAMIENTO',L+29,PH-66,10,false,'#E4D8F6');
-  txt('REGISTROS GUARDADOS',R-144,PH-50,8,true,'#B7BDC8');
+  txt('OBJETIVOS Y RESULTADOS',R-168,PH-50,8,true,'#B7BDC8');
   cy=PH-125;
  }
  function room(h){if(cy-h<BOTTOM)page()}
- function badge(s,x,y,full){const w=76;rounded(x,y,w,19,9,full?C.greenPale:C.amberPale);txt(full?'COMPLETO':'PARCIAL',x+10,y+6,8,true,full?C.green:C.amber)}
+ function badge(e,x,y){
+  const done=!!e.updated&&isDone(e.sets),planned=!e.updated;
+  const label=planned?'PLANIFICADO':done?'COMPLETO':'PARCIAL';
+  const bg=planned?C.purplePale:done?C.greenPale:C.amberPale;
+  const fg=planned?'#69489F':done?C.green:C.amber;
+  rounded(x,y,92,19,9,bg);txt(label,x+9,y+6,8,true,fg)
+ }
  function summary(){
   const h=110;room(h+12);const top=cy;rounded(L,top-h,W,h,11,C.bg,C.line);
   txt('PERÍODO',L+15,top-21,8,true,C.muted);txt(`${input.scope==='day'?'DÍA':'SEMANA'}  ${val(input.week)}`,L+15,top-40,15,true,C.ink);
   txt('PERFIL',L+150,top-21,8,true,C.muted);txt(fit(input.person||'Mi entrenamiento personal',W-190,11,true),L+150,top-40,11,true,C.slate);
   txt('Generado: '+dt(input.created),L+15,top-56,8,false,C.muted);
-  const labels=[['EJERCICIOS',exerciseCount],['SERIES',setCount],['VOLUMEN (kg x reps)',fmtNum(volume)+' kg']];
+  const labels=[['EJERCICIOS PLAN.',exerciseCount],['SERIES HECHAS',setCount],['VOLUMEN REGISTRADO',fmtNum(volume)+' kg']];
   const sx=L+15, cardW=(W-40)/3;
   labels.forEach(([lab,n],i)=>{const x=sx+i*(cardW+5);rounded(x,top-101,cardW,38,7,C.white,C.line);txt(lab,x+9,top-76,7,true,C.muted);txt(String(n),x+9,top-94,12,true,i===2?C.green:C.ink)});
   cy-=h+15;
@@ -93,13 +106,13 @@ function buildReport(input){
   const videoLines=final&&e.videoUrl?wrap(e.videoUrl,W-110,8.1):[];
   const topH=(first?82+goalLines.length*12:49);
   const footH=(notesLines.length?32+notesLines.length*12:0)+(videoLines.length?25+videoLines.length*11:0);
-  const h=topH+25+rows.length*ROW_H+footH+13;
+  const h=topH+25+Math.max(1,rows.length)*ROW_H+footH+13;
   room(h+10);const top=cy,bottom=top-h;
   rounded(L,bottom,W,h,9,C.white,C.line);rounded(L+1,bottom+2,4,h-4,2,C.purple);
   txt(fit(name,W-137,11.5,true),L+15,top-23,11.5,true,C.ink);
-  badge(e,L+W-92,top-31,isDone(e.sets));
+  badge(e,L+W-107,top-31);
   if(first){
-   txt('Guardado: '+dt(e.updated),L+15,top-39,7.7,false,C.muted);
+   txt(e.updated?'Registro: '+dt(e.updated):'Aún sin entrenamiento guardado',L+15,top-39,7.7,false,C.muted);
    txt('OBJETIVO PLANIFICADO',L+15,top-55,7.7,true,C.muted);
    lines(goalLines,L+15,top-70,8.8,C.slate,12);
   }else txt('Series realizadas (continuación)',L+15,top-41,8,false,C.muted);
@@ -107,6 +120,10 @@ function buildReport(input){
   rectangle(L+13,headY-23,W-26,23,C.purplePale);
   const cols=[L+25,L+130,L+246,L+360,L+437];
   [['SERIE',0],['PESO',1],['REPS',2],['RIR',3],['RPE',4]].forEach(([label,i])=>txt(label,cols[i],headY-15,8,true,C.slate));
+  if(!rows.length){
+   rectangle(L+13,headY-23-ROW_H,W-26,ROW_H,C.bg);
+   txt('SIN REGISTRO REALIZADO - solo objetivo planificado',L+25,headY-23-ROW_H+7,8.3,false,C.muted);
+  }
   rows.forEach((s,i)=>{
    const y=headY-23-(i+1)*ROW_H;
    if(i%2===0)rectangle(L+13,y,W-26,ROW_H,C.bg);
@@ -114,7 +131,7 @@ function buildReport(input){
    const cells=[String(idx),`${val(s.kg)} kg`,String(val(s.reps)),val(s.rir),effortText(s.rir)];
    cells.forEach((v,k)=>txt(fit(v,k===1?99:75,9,k===0),cols[k],y+7,9,k===0,k===0?C.purple:C.ink));
   });
-  let tail=headY-23-rows.length*ROW_H-11;
+  let tail=headY-23-Math.max(1,rows.length)*ROW_H-11;
   if(notesLines.length){
    txt('COMENTARIOS',L+15,tail,8,true,C.muted);tail-=16;
    const noteH=notesLines.length*12+10;rounded(L+14,tail-noteH+7,W-28,noteH,6,C.soft);
@@ -128,16 +145,16 @@ function buildReport(input){
   rounded(L,top-h,W,h,8,C.bg,C.line);txt(fit(kind+' - '+title,W-32,9,true),L+14,top-20,9,true,C.purple);lines(linesText,L+14,top-36,8.8,C.slate,12);cy-=h+9;
  }
  function renderExercise(e){
-  const all=Array.isArray(e.sets)?e.sets:[];
+  const all=e.updated&&Array.isArray(e.sets)?e.sets:[];
   const name=e.name||'Ejercicio';let idx=0;
   // Si un ejercicio completo entra en una página, no lo partimos entre hojas.
   const goalAll=planned(e);
   const allNotes=e.notes?.trim()?wrap(e.notes,W-61,8.8):[];
   const allVideo=e.videoUrl?wrap(e.videoUrl,W-110,8.1):[];
-  const fullHeight=82+goalAll.length*12+25+all.length*ROW_H+13
+  const fullHeight=82+goalAll.length*12+25+Math.max(1,all.length)*ROW_H+13
    +(allNotes.length?32+allNotes.length*12:0)+(allVideo.length?25+allVideo.length*11:0);
   if(all.length<=10 && fullHeight+10<=PH-125-BOTTOM && cy-fullHeight-10<BOTTOM)page();
-  if(!all.length){card(e,0,[],{first:true,final:true,start:0});}
+  if(!all.length){card(e,0,[],{first:true,final:true,start:0});return;}
   while(idx<all.length){
    const first=idx===0;const goal=first?planned(e):[];
    const base=(first?82+goal.length*12:49)+25+13+10;
@@ -160,8 +177,8 @@ function buildReport(input){
  }
  page();summary();
  for(const d of days){daySeq++;dayHeader(d);for(const e of d.items)renderExercise(e)}
- room(45);rounded(L,cy-36,W,36,8,C.purplePale);txt('Obsidiana refleja únicamente los registros guardados.',L+12,cy-16,8.6,true,C.slate);
- txt('No modifica rutinas ni comparte datos con terceros al exportar.',L+12,cy-29,8,C.muted);
+ room(45);rounded(L,cy-36,W,36,8,C.purplePale);txt('Incluye objetivos aun sin completar la semana.',L+12,cy-16,8.6,true,C.slate);
+ txt('Solo refleja lo realizado si ese registro fue guardado.',L+12,cy-29,8,C.muted);
  const objs=[null];const add=x=>{objs.push(x);return objs.length-1};
  const catalog=add(''),pagesRoot=add('');
  const f1=add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
@@ -203,7 +220,7 @@ function setup(){
   if(typeof guardDirty==='function'&&!guardDirty())return;
   const title=document.getElementById('modalTitle'),body=document.getElementById('modalBody'),overlay=document.getElementById('overlay');
   title.textContent='Exportar informe en PDF';
-  body.innerHTML='<p>Informe organizado por día y ejercicio, con cuadros de series, pesos, RIR/RPE y comentarios.</p><div class="pdf-export-dialog"><button type="button" class="button primary" id="obsPdfDay">Día actual</button><button type="button" class="button" id="obsPdfWeek">Semana completa</button></div><p id="obsPdfStatus" class="sub" role="status">Se incluyen únicamente los registros guardados.</p>';
+  body.innerHTML='<p>Exportá objetivos y resultados por día o semana, incluso si todavía no completaste el entrenamiento.</p><div class="pdf-export-dialog"><button type="button" class="button primary" id="obsPdfDay">Día actual</button><button type="button" class="button" id="obsPdfWeek">Semana completa</button></div><p id="obsPdfStatus" class="sub" role="status">Incluye todos los objetivos. Los resultados solo aparecen si ya fueron guardados.</p>';
   overlay.classList.add('open');
   for(const [id,scope] of [['obsPdfDay','day'],['obsPdfWeek','week']]){
    document.getElementById(id).onclick=async()=>{

@@ -23,14 +23,58 @@ function planOf(e){
 function planText(e){const p=planOf(e),reps=p.sets.map(s=>s.reps??'—').join('-');const weights=[...new Set(p.sets.map(s=>s.kg).filter(x=>x!==null))];return `${p.sets.length} series · ${reps} reps · ${weights.length===1?weights[0]+' kg':weights.length?'cargas variadas':'peso a definir'} · ${effortLabel()} objetivo ${shownEffort(p.rir)}`}
 function inputNumber(v){return v===null||v===undefined?'':v}
 function reasonClass(reason){const r=String(reason||'').toLocaleLowerCase('es');if(r.startsWith('recuperar'))return 'recuperar';if(r.startsWith('consolidar'))return 'consolidar';if(r.startsWith('progresar'))return 'progresar';if(r.startsWith('superaste')||r.startsWith('objetivo superado'))return 'superado';if(r.startsWith('descarga'))return 'descarga';if(r.includes('manual')||r.includes('personalizado'))return 'manual';return 'neutral'}
-function previousWeekMarkup(e){
- const before=model.weeks.find(w=>w.number===currentWeek-1);
- if(!before)return '';
- const found=before.days.flatMap(d=>d.exercises).find(x=>x.exerciseId===e.exerciseId && x.updated);
- if(!found)return `<div class="previous-week hidden"><div class="prev-title">SEMANA ${before.number} · REALIZADO</div><div class="prev-line">Sin registro de este ejercicio en esa semana.</div></div>`;
- const series=found.sets.map((s,i)=>`<span>S${i+1}: ${s.kg===null?'—':escapeHtml(s.kg)+' kg'} × ${s.reps===null?'—':escapeHtml(s.reps)}${s.rir===null?'':' · '+escapeHtml(effortText(s.rir))}</span>`).join('');
- return `<div class="previous-week hidden"><div class="prev-title">SEMANA ${before.number} · REALIZADO</div><div class="prev-line">${escapeHtml(summary(found))}</div><div class="prev-series">${series}</div>${found.notes?`<div class="prev-note">Nota: ${escapeHtml(found.notes)}</div>`:''}</div>`;
+function previousExercise(e){
+ if(!model||!Array.isArray(model.weeks))return null;
+ const older=model.weeks.filter(w=>w.number<currentWeek).sort((a,b)=>b.number-a.number);
+ for(const w of older){
+  const match=w.days.flatMap(d=>d.exercises).find(x=>x.exerciseId===e.exerciseId);
+  if(match)return {week:w,exercise:match};
+ }
+ return null;
 }
+// Las semanas creadas con versiones viejas conservan plan.reason.
+// El texto visible se recalcula sin editar ni borrar los datos originales.
+function actualProgressReason(e){
+ const p=planOf(e),reason=p.reason||'';
+ if(!/^progresar/i.test(reason)||!/rep(etici[oó]n|s)?/i.test(reason))return reason;
+ const prev=previousExercise(e);
+ if(!prev?.exercise.updated)return reason;
+ return ObsidianaProgression.describeRepetitionProgress(prev.exercise.sets,p.sets)||reason;
+}
+function openWeekComparison(e){
+ // Comparación estrictamente por ejercicio. Se consultan los datos persistidos,
+ // nunca entradas todavía sin guardar en el formulario.
+ const earlier=model.weeks.filter(w=>w.number<currentWeek).sort((a,b)=>b.number-a.number);
+ const previous=earlier.find(w=>w.days.some(d=>d.exercises.some(x=>x.exerciseId===e.exerciseId)));
+ if(!previous){alert('No hay una semana anterior con este ejercicio.');return}
+ const old=previous.days.flatMap(d=>d.exercises).find(x=>x.exerciseId===e.exerciseId);
+ const oldPlan=planOf(old),newPlan=planOf(e);
+ const pill=(s,i,effort,performed=false)=>`<span class="compare-series-chip"><b>S${i+1}</b> ${s?.kg??'—'} kg × ${s?.reps??'—'} reps${effort===null||effort===undefined?'':` · ${escapeHtml(effortText(effort))}`}</span>`;
+ const area=(title,sub,sets,effort,extra='')=>`<section class="compare-block"><div class="compare-block-head"><strong>${escapeHtml(title)}</strong><small>${escapeHtml(sub)}</small></div><div class="compare-series">${sets.length?sets.map((s,i)=>pill(s,i,typeof effort==='function'?effort(s,i):effort)).join(''):'<span class="muted">Sin series</span>'}</div>${extra}</section>`;
+ const prevPlanned=area(`Semana ${previous.number} · objetivo planificado`,`Rango ${oldPlan.min??8}–${oldPlan.max??12} reps · ${effortLabel()} objetivo ${shownEffort(oldPlan.rir)}`,oldPlan.sets,null);
+ const prevActual=area(`Semana ${previous.number} · realizado`,old.updated?'Datos que guardaste después de entrenar':'Sin registro guardado',old.updated?old.sets:[],s=>s.rir,old.notes?`<p class="compare-note"><strong>Comentarios:</strong> ${escapeHtml(old.notes)}</p>`:'');
+ const curGoal=area(`Semana ${currentWeek} · objetivo actual`,`Rango ${newPlan.min??8}–${newPlan.max??12} reps · ${effortLabel()} objetivo ${shownEffort(newPlan.rir)}`,newPlan.sets,null);
+ const changes=[];
+ if(old.updated){for(let i=0;i<Math.max(old.sets.length,newPlan.sets.length);i++){
+  const before=old.sets[i],after=newPlan.sets[i];
+  if(before && after && (before.reps!==after.reps||before.kg!==after.kg)) changes.push(`S${i+1}: ${before.kg??'—'} kg × ${before.reps??'—'} → ${after.kg??'—'} kg × ${after.reps??'—'}`);
+ }}
+ const summary=old.updated
+  ? `<div class="compare-changes"><b>Cambios propuestos desde lo realizado</b><p>${changes.length?changes.map(escapeHtml).join('<br>'):'No hay cambios de carga ni repeticiones.'}</p></div>`
+  : `<p class="muted">Para comparar la progresión es necesario guardar las series de la semana anterior.</p>`;
+ const textReason=actualProgressReason(e);
+ const note=textReason?`<div class="compare-reason">${escapeHtml(textReason)}</div>`:'';
+ const cmpRows=Array.from({length:Math.max(oldPlan.sets.length,old.updated?old.sets.length:0,newPlan.sets.length)},(_,i)=>{
+   const fmt=s=>s?`${s.reps??'—'} × ${s.kg??'—'} kg`:'—';
+   const a=oldPlan.sets[i],b=old.updated?old.sets[i]:null,c=newPlan.sets[i];
+   const delta=b&&c&&Number.isFinite(b.reps)&&Number.isFinite(c.reps)&&c.kg===b.kg
+     ?(c.reps>b.reps?`+${c.reps-b.reps} rep`:c.reps<b.reps?`${c.reps-b.reps} rep`:'='):'—';
+   return `<tr><th>S${i+1}</th><td>${escapeHtml(fmt(a))}</td><td>${escapeHtml(fmt(b))}</td><td>${escapeHtml(fmt(c))}</td><td class="cmp-delta">${escapeHtml(delta)}</td></tr>`;
+ }).join('');
+ const table=`<div class="compare-table-wrap"><table class="compare-table"><caption>Comparación por serie</caption><thead><tr><th>Serie</th><th>Objetivo anterior</th><th>Realizado</th><th>Objetivo actual</th><th>Cambio</th></tr></thead><tbody>${cmpRows}</tbody></table></div>`;
+ modal('Comparación · '+e.name,`<div class="compare-guide">Semana ${previous.number}: <strong>objetivo planificado y resultado real</strong> → Semana ${currentWeek}: <strong>objetivo nuevo</strong>. Todos los valores son por serie.</div>${table}${prevPlanned}${prevActual}${curGoal}${summary}${note}`);
+}
+
 function planSetMarkup(x,i){
  return `<div class="plan-set-row" data-plan-series-row>
    <span class="plan-set-label">S${i+1}</span>
@@ -53,8 +97,8 @@ function planMarkup(e){
  const p=planOf(e);
  const sameKg=p.sets.length>0&&p.sets.every(s=>s.kg!==null&&s.kg===p.sets[0].kg);
  return `<div class="plan-panel">
-  <div class="plan-top"><strong>OBJETIVO PLANIFICADO</strong><div class="plan-tools">${model.weeks.some(w=>w.number===currentWeek-1)?`<button type="button" class="button small" data-action="toggle-previous" aria-expanded="false">↶ Semana anterior</button>`:``}${e.videoUrl?`<button type="button" class="button small obs-video-open" data-action="open-video">▶ Ver video</button>`:``}<button type="button" class="button small" data-action="edit-video">${e.videoUrl?"✎ Video":"+ Video"}</button><button type="button" class="button small" data-action="toggle-plan">✎ Editar objetivo</button></div></div>
-  <div class="plan-line">${escapeHtml(planText(e))}</div>${previousWeekMarkup(e)}${p.reason?`<div class="plan-reason ${reasonClass(p.reason)}">${escapeHtml(p.reason)}</div>`:``}
+  <div class="plan-top"><strong>OBJETIVO PLANIFICADO</strong><div class="plan-tools">${model.weeks.some(w=>w.number<currentWeek&&w.days.some(d=>d.exercises.some(x=>x.exerciseId===e.exerciseId)))?`<button type="button" class="button small" data-action="toggle-previous">↶ Comparar semanas</button>`:``}${e.videoUrl?`<button type="button" class="button small obs-video-open" data-action="open-video">▶ Ver video</button>`:``}<button type="button" class="button small" data-action="edit-video">${e.videoUrl?"✎ Video":"+ Video"}</button><button type="button" class="button small" data-action="toggle-plan">✎ Editar objetivo</button></div></div>
+  <div class="plan-line">${escapeHtml(planText(e))}</div>${actualProgressReason(e)?`<div class="plan-reason ${reasonClass(actualProgressReason(e))}">${escapeHtml(actualProgressReason(e))}</div>`:``}
   <div class="plan-edit hidden">
    <label>Reps mín.<input data-plan="min" type="number" min="1" max="200" value="${p.min}"></label>
    <label>Reps máx.<input data-plan="max" type="number" min="1" max="200" value="${p.max}"></label>
@@ -146,7 +190,7 @@ $('cards').addEventListener('input',ev=>{
  if(!ev.target.closest('.plan-edit'))c.dataset.workoutDirty='1';
  draftBadge(c);
 });
-$('cards').addEventListener('click',async ev=>{const b=ev.target.closest('[data-action]');if(!b)return;const c=b.closest('.card'),e=exerciseFrom(c),a=b.dataset.action;try{if(a==='toggle-adjust'){const extra=b.closest('.set-row').querySelector('.set-extra');extra.classList.toggle('hidden');b.setAttribute('aria-expanded',String(!extra.classList.contains('hidden')));return}if(a==='toggle-previous'){const box=c.querySelector('.previous-week');if(box){box.classList.toggle('hidden');b.setAttribute('aria-expanded',String(!box.classList.contains('hidden')))}return}if(a==='toggle-plan'){c.querySelector('.plan-edit').classList.toggle('hidden');return}if(a==='open-video'){
+$('cards').addEventListener('click',async ev=>{const b=ev.target.closest('[data-action]');if(!b)return;const c=b.closest('.card'),e=exerciseFrom(c),a=b.dataset.action;try{if(a==='toggle-adjust'){const extra=b.closest('.set-row').querySelector('.set-extra');extra.classList.toggle('hidden');b.setAttribute('aria-expanded',String(!extra.classList.contains('hidden')));return}if(a==='toggle-previous'){openWeekComparison(e);return}if(a==='toggle-plan'){c.querySelector('.plan-edit').classList.toggle('hidden');return}if(a==='open-video'){
  const url=e.videoUrl;
  if(!url||!/^https:\/\//i.test(url)){alert('El ejercicio no tiene un enlace de video válido.');return;}
  if(typeof window.obsidianaOpenExternal==='function')await window.obsidianaOpenExternal(url);

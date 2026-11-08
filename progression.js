@@ -9,6 +9,24 @@ const clone=x=>JSON.parse(JSON.stringify(x));
 const rirToRpe=x=>n(x)===null?null:Math.max(1,Math.min(10,Math.round((10-x)*2)/2));
 const rpeToRir=x=>n(x)===null?null:Math.round((10-x)*2)/2;
 function sameSets(a,b){return Array.isArray(a)&&Array.isArray(b)&&a.length===b.length&&a.every((s,i)=>close(s.kg,b[i].kg)&&s.reps===b[i].reps)}
+// Texto derivado del cambio REAL entre series realizadas y nuevo objetivo.
+// Importante: la serie que llegó al tope NO cuenta como una serie que progresa.
+function describeRepetitionProgress(actual,goal){
+ if(!Array.isArray(actual)||!Array.isArray(goal)||actual.length!==goal.length)return null;
+ const idx=[];
+ for(let i=0;i<actual.length;i++){
+  const before=actual[i],after=goal[i];
+  if(n(before?.reps)===null||n(after?.reps)===null||!close(before.kg,after.kg))return null;
+  const difference=after.reps-before.reps;
+  if(difference<0||difference>1)return null;
+  if(difference===1)idx.push(i+1);
+ }
+ const source=actual.map(s=>s.reps).join('-');
+ const target=goal.map(s=>s.reps).join('-');
+ if(!idx.length)return `Consolidar · sin aumento de repeticiones (${source})`;
+ const series=idx.length===1?`serie ${idx[0]}`:`series ${idx.slice(0,-1).join(', ')} y ${idx.at(-1)}`;
+ return `Progresar · +1 repetición en ${series} (${source} → ${target})`;
+}
 // Verificación clara antes de aplicar progresión automática.
 // No confundir una carga distinta al objetivo con un registro incompleto.
 function inspectRecord(source){
@@ -59,17 +77,22 @@ function propose(source,mode,history=[]){
    // La carga solo sube con incremento definido por el usuario, nunca inventado.
    return ret(out.map(s=>({kg:Math.round((s.kg+increment)*100)/100,reps:min})),'Progresar · rango completo; subimos carga y reiniciamos reps');
   }
-  if(increment===null||increment<=0)return ret(out,'Tope del rango · configurá el incremento de kg para subir carga');
+  if(increment===null||increment<=0)return ret(out,`Tope del rango (${max} reps en todas las series) · definí «Subida kg» en Editar objetivo para poder aumentar la carga`);
   return ret(out,'Consolidar · repetí el tope del rango una sesión más antes de subir peso');
  }
  // Escalonado por margen de esfuerzo. RIR objetivo+2: tres series; +1: dos; objetivo: primera elegible.
  const minMargin=Math.min(...performed.map(s=>s.rir-target));
  const budget=minMargin>=2?3:minMargin>=1?2:1;
- let added=0;
- for(let i=0;i<out.length&&added<budget;i++){
-  if(out[i].reps<max && performed[i].rir>=target){out[i].reps++;added++}
+ const changed=[];
+ for(let i=0;i<out.length&&changed.length<budget;i++){
+  if(out[i].reps<max && performed[i].rir>=target){out[i].reps++;changed.push(i+1)}
  }
- let reason=added===3?'Progresar · +1 repetición en las primeras 3 series':added===2?'Progresar · +1 repetición en las primeras 2 series':added===1?'Progresar · +1 repetición en la primera serie disponible':'Consolidar · mantenemos la planificación';
+ // Indicar las series reales modificadas, no 'las primeras N': alguna puede estar en el tope.
+ // Construir siempre la explicación desde las diferencias, no desde el presupuesto
+ // teórico de series. Ejemplo: 12-11-11 -> 12-12-12 = series 2 y 3.
+ let reason=describeRepetitionProgress(performed,out)
+  || 'Consolidar · revisá las cargas antes de avanzar';
+
  // La ampliación de volumen NO es automática: requiere tener en cuenta recuperación,
  // objetivo y volumen semanal total que la app no conoce suficientemente.
  const currentComparable=performed.map(s=>({kg:s.kg,reps:s.reps}));
@@ -78,7 +101,7 @@ function propose(source,mode,history=[]){
  if(plateau&&p.volumeEnabled!==false)reason+=' · 3 sesiones similares: podés evaluar +1 serie si recuperás bien';
  return ret(out,reason,{volumeCandidate:!!(plateau&&p.volumeEnabled!==false)});
 }
-const api={propose,inspectRecord,rirToRpe,rpeToRir,sameSets};
+const api={propose,inspectRecord,rirToRpe,rpeToRir,sameSets,describeRepetitionProgress};
 root.ObsidianaProgression=api;
 if(typeof module==='object'&&module.exports)module.exports=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
