@@ -7,7 +7,7 @@ function getDB(){return new Promise((resolve,reject)=>{const tx=db.transaction(S
 function putDB(v){return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).put(v,'main');tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error)})}
 function fresh(){return {version:2,week:1,weeks:[{number:1,days:[1,2,3,4,5].map(n=>({number:n,exercises:[]}))}]}}
 function week(){return model.weeks.find(w=>w.number===currentWeek)}function day(){return week().days.find(d=>d.number===currentDay)}
-function validate(m){if(!m||m.version!==2||!Array.isArray(m.weeks)||!m.weeks.length||m.weeks.length>500)throw Error('Archivo no compatible con Obsidiana V2.');const ids=new Set();for(const w of m.weeks){if(!Number.isInteger(w.number)||!Array.isArray(w.days)||w.days.length<1||w.days.length>31)throw Error('Semanas inválidas.');for(const d of w.days){if(!Number.isInteger(d.number)||d.number<1||!Array.isArray(d.exercises)||d.exercises.length>200||(d.name!==undefined&&(typeof d.name!=='string'||d.name.length>60)))throw Error('Días inválidos.');for(const e of d.exercises){if(typeof e.id!=='string'||ids.has(e.id)||typeof e.name!=='string'||e.name.length>150||!Array.isArray(e.sets)||e.sets.length>30||typeof e.notes!=='string'||e.notes.length>5000)throw Error('Datos de ejercicios inválidos.');if(e.videoUrl!==undefined&&(typeof e.videoUrl!=='string'||e.videoUrl.length>2048||e.videoUrl!==''&&!/^https:\/\//i.test(e.videoUrl)))throw Error('Enlace de video inválido.');ids.add(e.id);for(const s of e.sets){for(const key of ['kg','reps','rir'])if(s[key]!==null&&!(typeof s[key]==='number'&&Number.isFinite(s[key])&&s[key]>=0&&s[key]<=1000))throw Error('Serie inválida.')}}}}}
+function validate(m){if(!m||m.version!==2||!Array.isArray(m.weeks)||!m.weeks.length||m.weeks.length>500)throw Error('Archivo no compatible con Obsidiana V2.');const ids=new Set();for(const w of m.weeks){if(!Number.isInteger(w.number)||!Array.isArray(w.days)||w.days.length<1||w.days.length>31)throw Error('Semanas inválidas.');for(const d of w.days){if(!Number.isInteger(d.number)||d.number<1||!Array.isArray(d.exercises)||d.exercises.length>200||(d.name!==undefined&&(typeof d.name!=='string'||d.name.length>60)))throw Error('Días inválidos.');for(const e of d.exercises){if(typeof e.id!=='string'||ids.has(e.id)||typeof e.name!=='string'||e.name.length>150||!Array.isArray(e.sets)||e.sets.length>30||typeof e.notes!=='string'||e.notes.length>5000)throw Error('Datos de ejercicios inválidos.');if(e.videoUrl!==undefined&&(typeof e.videoUrl!=='string'||e.videoUrl.length>2048||e.videoUrl!==''&&!/^https:\/\//i.test(e.videoUrl)))throw Error('Enlace de video inválido.');ids.add(e.id);for(const s of e.sets){for(const key of ['kg','reps','rir'])if(s[key]!==null&&!(typeof s[key]==='number'&&Number.isFinite(s[key])&&s[key]>=0&&s[key]<=1000))throw Error('Serie inválida.');if(s.sides!==undefined){for(const side of ['left','right'])for(const k of ['kg','reps','rir']){const v=s.sides?.[side]?.[k];if(v!==null&&v!==undefined&&!(typeof v==='number'&&Number.isFinite(v)&&v>=0&&v<=1000))throw Error('Serie unilateral inválida.')}}}if(e.unilateral!==undefined&&typeof e.unilateral!=='boolean')throw Error('Tipo de ejercicio inválido.')}}}}
 async function persist(){model.week=currentWeek;if(typeof rememberWorkspace==='function')rememberWorkspace();validate(model);await putDB(model)}
 function effortScale(){return model?.effortScale==='rpe'?'rpe':'rir'}
 function effortLabel(){return effortScale().toUpperCase()}
@@ -20,7 +20,7 @@ function planOf(e){
  e.plan.min??=8;e.plan.max??=12;e.plan.rir??=1;e.plan.increment??=null;e.plan.volumeEnabled??=true;
  return e.plan;
 }
-function planText(e){const p=planOf(e),reps=p.sets.map(s=>s.reps??'—').join('-');const weights=[...new Set(p.sets.map(s=>s.kg).filter(x=>x!==null))];return `${p.sets.length} series · ${reps} reps · ${weights.length===1?weights[0]+' kg':weights.length?'cargas variadas':'peso a definir'} · ${effortLabel()} objetivo ${shownEffort(p.rir)}`}
+function planText(e){const p=planOf(e),reps=p.sets.map(s=>s.reps??'—').join('-');const weights=[...new Set(p.sets.map(s=>s.kg).filter(x=>x!==null))];return `${e.unilateral?'Unilateral · ':''}${p.sets.length} series · ${reps} reps · ${weights.length===1?weights[0]+' kg':weights.length?'cargas variadas':'peso a definir'} · ${effortLabel()} objetivo ${shownEffort(p.rir)}`}
 function inputNumber(v){return v===null||v===undefined?'':v}
 function reasonClass(reason){const r=String(reason||'').toLocaleLowerCase('es');if(r.startsWith('recuperar'))return 'recuperar';if(r.startsWith('consolidar'))return 'consolidar';if(r.startsWith('progresar'))return 'progresar';if(r.startsWith('superaste')||r.startsWith('objetivo superado'))return 'superado';if(r.startsWith('descarga'))return 'descarga';if(r.includes('manual')||r.includes('personalizado'))return 'manual';return 'neutral'}
 function previousExercise(e){
@@ -49,7 +49,10 @@ function openWeekComparison(e){
  if(!previous){alert('No hay una semana anterior con este ejercicio.');return}
  const old=previous.days.flatMap(d=>d.exercises).find(x=>x.exerciseId===e.exerciseId);
  const oldPlan=planOf(old),newPlan=planOf(e);
- const pill=(s,i,effort,performed=false)=>`<span class="compare-series-chip"><b>S${i+1}</b> ${s?.kg??'—'} kg × ${s?.reps??'—'} reps${effort===null||effort===undefined?'':` · ${escapeHtml(effortText(effort))}`}</span>`;
+ const pill=(s,i,effort,performed=false)=>{
+  if(s?.sides){return `<span class="compare-series-chip"><b>S${i+1}</b> ${['left','right'].map(side=>{const x=s.sides?.[side]||s;const goal=s.sides?.[side]||s;const kg=x.kg??s.kg??'—', reps=x.reps??s.reps??'—';const v=x.rir??(typeof effort==='number'?effort:null);return `${side==='left'?'Izq.':'Der.'} ${escapeHtml(kg)} kg × ${escapeHtml(reps)}${v==null?'':' · '+escapeHtml(effortText(v))}`}).join(' / ')}</span>`}
+  return `<span class="compare-series-chip"><b>S${i+1}</b> ${s?.kg??'—'} kg × ${s?.reps??'—'} reps${effort===null||effort===undefined?'':` · ${escapeHtml(effortText(effort))}`}</span>`;
+ };
  const area=(title,sub,sets,effort,extra='')=>`<section class="compare-block"><div class="compare-block-head"><strong>${escapeHtml(title)}</strong><small>${escapeHtml(sub)}</small></div><div class="compare-series">${sets.length?sets.map((s,i)=>pill(s,i,typeof effort==='function'?effort(s,i):effort)).join(''):'<span class="muted">Sin series</span>'}</div>${extra}</section>`;
  const prevPlanned=area(`Semana ${previous.number} · objetivo planificado`,`Rango ${oldPlan.min??8}–${oldPlan.max??12} reps · ${effortLabel()} objetivo ${shownEffort(oldPlan.rir)}`,oldPlan.sets,null);
  const prevActual=area(`Semana ${previous.number} · realizado`,old.updated?'Datos que guardaste después de entrenar':'Sin registro guardado',old.updated?old.sets:[],s=>s.rir,old.notes?`<p class="compare-note"><strong>Comentarios:</strong> ${escapeHtml(old.notes)}</p>`:'');
@@ -65,22 +68,32 @@ function openWeekComparison(e){
  const textReason=actualProgressReason(e);
  const note=textReason?`<div class="compare-reason">${escapeHtml(textReason)}</div>`:'';
  const cmpRows=Array.from({length:Math.max(oldPlan.sets.length,old.updated?old.sets.length:0,newPlan.sets.length)},(_,i)=>{
-   const fmt=s=>s?`${s.reps??'—'} × ${s.kg??'—'} kg`:'—';
    const a=oldPlan.sets[i],b=old.updated?old.sets[i]:null,c=newPlan.sets[i];
-   const delta=b&&c&&Number.isFinite(b.reps)&&Number.isFinite(c.reps)&&c.kg===b.kg
-     ?(c.reps>b.reps?`+${c.reps-b.reps} rep`:c.reps<b.reps?`${c.reps-b.reps} rep`:'='):'—';
-   return `<tr><th>S${i+1}</th><td>${escapeHtml(fmt(a))}</td><td>${escapeHtml(fmt(b))}</td><td>${escapeHtml(fmt(c))}</td><td class="cmp-delta">${escapeHtml(delta)}</td></tr>`;
+   const fmt=(s,side)=>{
+    if(!s)return '—';
+    const v=side?(s.sides?.[side]||{}):s;
+    return `${v.reps??s.reps??'—'} × ${v.kg??s.kg??'—'} kg`;
+   };
+   const delta=(before,after)=>before&&after&&Number.isFinite(before.reps)&&Number.isFinite(after.reps)&&before.kg===after.kg
+    ?(after.reps>before.reps?`+${after.reps-before.reps} rep`:after.reps<before.reps?`${after.reps-before.reps} rep`:'='):'—';
+   if(old.unilateral||e.unilateral){return ['left','right'].map(side=>{
+    const bv=b?.sides?.[side],cv=c?ObsidianaProgression.goalSide(c,side):null;
+    return `<tr><th>S${i+1} ${side==='left'?'Izq.':'Der.'}</th><td>${escapeHtml(fmt(a,side))}</td><td>${escapeHtml(fmt(b,side))}</td><td>${escapeHtml(fmt(c,side))}</td><td class="cmp-delta">${escapeHtml(delta(bv,cv))}</td></tr>`;
+   }).join('')}
+   return `<tr><th>S${i+1}</th><td>${escapeHtml(fmt(a))}</td><td>${escapeHtml(fmt(b))}</td><td>${escapeHtml(fmt(c))}</td><td class="cmp-delta">${escapeHtml(delta(b,c))}</td></tr>`;
  }).join('');
  const table=`<div class="compare-table-wrap"><table class="compare-table"><caption>Comparación por serie</caption><thead><tr><th>Serie</th><th>Objetivo anterior</th><th>Realizado</th><th>Objetivo actual</th><th>Cambio</th></tr></thead><tbody>${cmpRows}</tbody></table></div>`;
  modal('Comparación · '+e.name,`<div class="compare-guide">Semana ${previous.number}: <strong>objetivo planificado y resultado real</strong> → Semana ${currentWeek}: <strong>objetivo nuevo</strong>. Todos los valores son por serie.</div>${table}${prevPlanned}${prevActual}${curGoal}${summary}${note}`);
 }
 
 function planSetMarkup(x,i){
+ const sideFields=side=>{const name=side==='left'?'Izquierda':'Derecha',data=x.sides?.[side]||{};return `<div class="plan-side-target"><b>${name}</b><input data-plan-side="${side}-reps" type="number" min="1" max="200" placeholder="Reps base" inputmode="numeric" aria-label="${name}, repeticiones objetivo serie ${i+1}" value="${escapeHtml(inputNumber(data.reps))}"><input data-plan-side="${side}-kg" type="number" min="0" max="1000" step="any" inputmode="decimal" placeholder="Kg base" aria-label="${name}, peso objetivo serie ${i+1}" value="${escapeHtml(inputNumber(data.kg))}"></div>`};
  return `<div class="plan-set-row" data-plan-series-row>
    <span class="plan-set-label">S${i+1}</span>
    <input data-plan-reps="${i}" type="number" min="1" max="200" step="1" inputmode="numeric" placeholder="Reps" aria-label="Repeticiones objetivo serie ${i+1}" value="${escapeHtml(inputNumber(x.reps))}">
    <input data-plan-kg="${i}" type="number" min="0" max="1000" step="any" inputmode="decimal" placeholder="kg" aria-label="Peso objetivo serie ${i+1}" value="${escapeHtml(inputNumber(x.kg))}">
    <button type="button" class="plan-remove-set" data-action="remove-plan-set" title="Quitar serie del objetivo" aria-label="Quitar serie ${i+1} del objetivo">×</button>
+   <div class="plan-side-targets">${sideFields("left")}${sideFields("right")}</div>
  </div>`;
 }
 function renumberPlanRows(c){
@@ -96,10 +109,11 @@ function renumberPlanRows(c){
 function planMarkup(e){
  const p=planOf(e);
  const sameKg=p.sets.length>0&&p.sets.every(s=>s.kg!==null&&s.kg===p.sets[0].kg);
- return `<div class="plan-panel">
+ return `<div class="plan-panel ${e.unilateral?'editing-unilateral':''}">
   <div class="plan-top"><strong>OBJETIVO PLANIFICADO</strong><div class="plan-tools">${model.weeks.some(w=>w.number<currentWeek&&w.days.some(d=>d.exercises.some(x=>x.exerciseId===e.exerciseId)))?`<button type="button" class="button small" data-action="toggle-previous">↶ Comparar semanas</button>`:``}${e.videoUrl?`<button type="button" class="button small obs-video-open" data-action="open-video">▶ Ver video</button>`:``}<button type="button" class="button small" data-action="edit-video">${e.videoUrl?"✎ Video":"+ Video"}</button><button type="button" class="button small" data-action="toggle-plan">✎ Editar objetivo</button></div></div>
   <div class="plan-line">${escapeHtml(planText(e))}</div>${actualProgressReason(e)?`<div class="plan-reason ${reasonClass(actualProgressReason(e))}">${escapeHtml(actualProgressReason(e))}</div>`:``}
   <div class="plan-edit hidden">
+   <label class="unilateral-toggle"><input type="checkbox" data-plan="unilateral" ${e.unilateral?'checked':''}> Ejercicio unilateral · registrar izquierda y derecha por separado</label>
    <label>Reps mín.<input data-plan="min" type="number" min="1" max="200" value="${p.min}"></label>
    <label>Reps máx.<input data-plan="max" type="number" min="1" max="200" value="${p.max}"></label>
    <label>${effortLabel()} objetivo<input data-plan="rir" type="number" ${effortRange()} step="0.5" inputmode="decimal" value="${shownEffort(p.rir)}"></label>
@@ -108,7 +122,7 @@ function planMarkup(e){
     <label class="plan-general-weight">Peso para todas las series (kg)
      <input data-plan="all-kg" type="number" min="0" max="1000" step="any" inputmode="decimal" placeholder="Ej. 66" value="${sameKg?inputNumber(p.sets[0].kg):''}">
     </label>
-    <p class="plan-help">Se completa en todas las series. Después podés modificar el peso de cualquiera por separado.</p>
+    <p class="plan-help">Se completa en todas las series. Después podés modificar el peso de cualquiera por separado.</p><p class="plan-help">Si es unilateral, los campos por lado son opcionales: vacíos usan el objetivo general.</p>
     <div class="plan-series-heading"><span></span><span>REPS</span><span>KG</span><span></span></div>
     <div class="plan-series-list">${p.sets.map(planSetMarkup).join('')}</div>
     <div class="plan-series-actions">
@@ -122,9 +136,11 @@ function planMarkup(e){
   </div>
  </div>`;
 }
-function completed(e){return !!e.updated&&e.sets.length>0&&e.sets.every(s=>s.kg!==null&&s.reps!==null&&s.reps>0&&s.rir!==null&&s.rir!==undefined)}
+function completeSet(s){return s?.kg!==null&&s?.kg!==undefined&&Number.isFinite(s.kg)&&s?.reps>0&&s?.rir!==null&&s?.rir!==undefined&&Number.isFinite(s.rir)}
+function completed(e){return !!e.updated&&e.sets.length>0&&e.sets.every(s=>e.unilateral?completeSet(s.sides?.left)&&completeSet(s.sides?.right):completeSet(s))}
 function summary(e){
- if(!completed(e))return `${e.sets.length} series · Pendiente`;
+ if(!completed(e))return `${e.sets.length} series · Pendiente${e.unilateral?' (izq. y der.)':''}`;
+ if(e.unilateral)return `Unilateral · ${e.sets.length} series · izquierda / derecha · ${effortLabel()} por lado`;
  const weights=[...new Set(e.sets.map(s=>s.kg))];
  const rirs=[...new Set(e.sets.map(s=>s.rir))];
  const reps=e.sets.map(s=>s.reps).join('-');
@@ -134,20 +150,35 @@ function summary(e){
 }
 function compactDetails(e){
  if(!completed(e))return '';
+ if(e.unilateral)return `<div class="series-preview">${e.sets.map((s,i)=>`<span><b>S${i+1}</b> Izq. ${s.sides.left.kg}kg × ${s.sides.left.reps} / Der. ${s.sides.right.kg}kg × ${s.sides.right.reps}</span>`).join('')}</div>`;
  const weights=[...new Set(e.sets.map(s=>s.kg))];
  const rirs=[...new Set(e.sets.map(s=>s.rir))];
  if(weights.length===1&&rirs.length===1)return '';
  return `<div class="series-preview">${e.sets.map((s,i)=>`<span><b>S${i+1}</b> ${escapeHtml(s.kg)} kg × ${escapeHtml(s.reps)}${rirs.length>1?' · '+escapeHtml(effortText(s.rir)):''}</span>`).join('')}</div>`;
 }
 function seriesDetail(e){
+ if(e.unilateral)return e.sets.map((s,i)=>`<div class="hist-series unilateral-hist"><strong>S${i+1}</strong>${['left','right'].map(side=>{const x=s.sides?.[side];return `<span>${side==='left'?'Izq.':'Der.'}: <b>${escapeHtml(x?.kg??'—')} kg</b> × ${escapeHtml(x?.reps??'—')} · ${effortLabel()} ${escapeHtml(shownEffort(x?.rir)??'—')}</span>`}).join('')}</div>`).join('');
  return e.sets.map((s,i)=>`<div class="hist-series"><span>Serie ${i+1}</span><b>${escapeHtml(s.kg??'—')} kg</b><span>${escapeHtml(s.reps??'—')} reps</span><span>${effortLabel()} ${escapeHtml(shownEffort(s.rir)??'—')}</span></div>`).join('');
 }
-function render(){if($('effortScale'))$('effortScale').value=effortScale();model.weeks.sort((a,b)=>a.number-b.number);$('week').innerHTML=model.weeks.map(w=>`<option value="${w.number}">Semana ${w.number}</option>`).join('');$('week').value=currentWeek;$('bigWeek').textContent=String(currentWeek).padStart(2,'0');$('days').innerHTML=week().days.map(d=>`<button class="day ${d.number===currentDay?'active':''}" data-day="${d.number}"><b>${escapeHtml(d.name||'Día '+d.number)}</b><small>${d.exercises.filter(completed).length}/${d.exercises.length} completos</small></button>`).join('');$('dayTitle').textContent=day().name||'Día '+currentDay;const es=day().exercises;$('progress').style.width=(es.length?100*es.filter(completed).length/es.length:0)+'%';$('summary').textContent=`${es.filter(completed).length} de ${es.length} ejercicios · ${es.reduce((a,e)=>a+e.sets.filter(s=>s.reps!==null).length,0)} series registradas`;$('cards').innerHTML=es.length?es.map((e,i)=>{planOf(e);const base=e.sets[0]?.kg??null;const rirs=e.sets.map(s=>s.rir).filter(v=>v!==null);const rir=rirs.length?rirs.reduce((a,v)=>rirs.filter(x=>x===v).length>rirs.filter(x=>x===a).length?v:a,rirs[0]):null;return `<details class="card ${completed(e)?'complete':''}" data-id="${escapeHtml(e.id)}"><summary><span class="count">${completed(e)?'✓':i+1}</span><div class="title"><b>${escapeHtml(e.name)}</b><small>${escapeHtml(summary(e))}</small>${compactDetails(e)}</div><span class="muted">⌄</span></summary><div class="body">${planMarkup(e)}<div class="common-fields"><label>Peso general (kg)<input data-common="kg" type="number" min="0" max="1000" step="any" inputmode="decimal" placeholder="Ej. 60" value="${base??''}"></label><label>${effortLabel()} general<input data-common="rir" type="number" ${effortRange()} step="0.5" inputmode="decimal" placeholder="${effortScale()==='rpe'?'Ej. 9':'Ej. 1'}" value="${shownEffort(rir)??''}"></label></div><div class="sets-header"><span>Nº</span><span>REPS</span><span></span><span></span></div><div class="setrows">${e.sets.map((set,j)=>setHTML(set,j,base,rir)).join('')}</div><div class="actions"><button type="button" class="button small goal-fill" data-action="fill-goal" title="Completa peso y repeticiones según el objetivo, sin cargar el esfuerzo ni guardar">✓ Cargar objetivo</button><button class="button small" data-action="add-set">+ Serie</button><button class="button small" data-action="history">Historial</button><button class="button small danger" data-action="delete-exercise">Eliminar ejercicio</button></div><label>Notas del ejercicio<textarea data-notes maxlength="5000" placeholder="Cómo te sentiste, cambio de máquina, molestias, técnica…">${escapeHtml(e.notes)}</textarea></label><div class="actions"><button class="button primary small" data-action="save">Guardar registro ✓</button></div><div class="status">${e.updated?'Guardado · '+new Date(e.updated).toLocaleString('es-AR'):'Pendiente de guardar'}</div></div></details>`}).join(''):'<div class="blank">Todavía no hay ejercicios en este día. Tocá «+ Ejercicio» para empezar.</div>'}
-function setHTML(s,j,base,baseRir=null){
+function render(){if($('effortScale'))$('effortScale').value=effortScale();model.weeks.sort((a,b)=>a.number-b.number);$('week').innerHTML=model.weeks.map(w=>`<option value="${w.number}">Semana ${w.number}</option>`).join('');$('week').value=currentWeek;$('bigWeek').textContent=String(currentWeek).padStart(2,'0');$('days').innerHTML=week().days.map(d=>`<button class="day ${d.number===currentDay?'active':''}" data-day="${d.number}"><b>${escapeHtml(d.name||'Día '+d.number)}</b><small>${d.exercises.filter(completed).length}/${d.exercises.length} completos</small></button>`).join('');$('dayTitle').textContent=day().name||'Día '+currentDay;const es=day().exercises;$('progress').style.width=(es.length?100*es.filter(completed).length/es.length:0)+'%';$('summary').textContent=`${es.filter(completed).length} de ${es.length} ejercicios · ${es.reduce((a,e)=>a+e.sets.filter(s=>s.reps!==null).length,0)} series registradas`;$('cards').innerHTML=es.length?es.map((e,i)=>{planOf(e);const base=e.sets[0]?.kg??(e.unilateral?planOf(e).sets[0]?.kg:null)??null;const rirs=e.sets.flatMap(s=>e.unilateral?[s.sides?.left?.rir,s.sides?.right?.rir]:[s.rir]).filter(v=>v!==null&&v!==undefined);const rir=rirs.length?rirs.reduce((a,v)=>rirs.filter(x=>x===v).length>rirs.filter(x=>x===a).length?v:a,rirs[0]):null;return `<details class="card ${completed(e)?'complete':''}" data-id="${escapeHtml(e.id)}"><summary><span class="count">${completed(e)?'✓':i+1}</span><div class="title"><b>${escapeHtml(e.name)}</b><small>${escapeHtml(summary(e))}</small>${compactDetails(e)}</div><span class="muted">⌄</span></summary><div class="body">${planMarkup(e)}<div class="common-fields"><label>Peso general (kg)<input data-common="kg" type="number" min="0" max="1000" step="any" inputmode="decimal" placeholder="Ej. 60" value="${base??''}"></label><label>${effortLabel()} general<input data-common="rir" type="number" ${effortRange()} step="0.5" inputmode="decimal" placeholder="${effortScale()==='rpe'?'Ej. 9':'Ej. 1'}" value="${shownEffort(rir)??''}"></label></div><div class="sets-header"><span>Nº</span><span>REPS</span><span></span><span></span></div><div class="setrows">${e.sets.map((set,j)=>setHTML(set,j,base,rir,!!e.unilateral)).join('')}</div><div class="actions"><button type="button" class="button small goal-fill" data-action="fill-goal" title="Completa peso y repeticiones según el objetivo, sin cargar el esfuerzo ni guardar">✓ Cargar objetivo</button><button class="button small" data-action="add-set">+ Serie</button><button class="button small" data-action="history">Historial</button><button class="button small danger" data-action="delete-exercise">Eliminar ejercicio</button></div><label>Notas del ejercicio<textarea data-notes maxlength="5000" placeholder="Cómo te sentiste, cambio de máquina, molestias, técnica…">${escapeHtml(e.notes)}</textarea></label><div class="actions"><button class="button primary small" data-action="save">Guardar registro ✓</button></div><div class="status">${e.updated?'Guardado · '+new Date(e.updated).toLocaleString('es-AR'):'Pendiente de guardar'}</div></div></details>`}).join(''):'<div class="blank">Todavía no hay ejercicios en este día. Tocá «+ Ejercicio» para empezar.</div>'}
+function setHTML(s,j,base,baseRir=null,unilateral=false){
+ if(unilateral){
+  const sideUI=side=>{const label=side==='left'?'Izquierda':'Derecha';const x=s.sides?.[side]||{};
+   const kg=x.kg??null, rir=x.rir??null;
+   return `<div class="unilateral-side"><b>${label}</b><label>Reps<input data-side="${side}" data-field="reps" type="number" min="0" max="200" inputmode="numeric" placeholder="Reps" value="${escapeHtml(inputNumber(x.reps))}"></label><label>kg<input data-side="${side}" data-field="kg" type="number" min="0" max="1000" step="any" inputmode="decimal" placeholder="General" value="${kg!==null&&kg!==base?escapeHtml(kg):''}"></label><label>${effortLabel()}<input data-side="${side}" data-field="rir" type="number" ${effortRange()} step="0.5" inputmode="decimal" placeholder="General" value="${rir!==null&&rir!==baseRir?escapeHtml(shownEffort(rir)):''}"></label></div>`;
+  };
+  return `<div class="set-row unilateral-set-row"><span class="set-number">${j+1}</span><div class="unilateral-pair">${sideUI('left')}${sideUI('right')}</div><button class="remove" data-action="remove-set" data-index="${j}" aria-label="Quitar serie">×</button></div>`;
+ }
+
  const override=s.kg!==null&&base!==null&&s.kg!==base;
  const overrideRir=s.rir!==null&&baseRir!==null&&s.rir!==baseRir;
  const expanded=override||overrideRir;
  return `<div class="set-row"><span class="set-number">${j+1}</span><input data-prop="reps" type="number" min="0" max="200" step="1" inputmode="numeric" placeholder="Reps" value="${s.reps??''}" aria-label="Repeticiones de serie ${j+1}"><button type="button" class="adjust-btn ${expanded?'changed':''}" data-action="toggle-adjust" aria-expanded="${expanded}" title="Ajustar peso o ${effortLabel()}">${expanded?'⚙ Ajustado':'⚙ Ajustar'}</button><button class="remove" data-action="remove-set" data-index="${j}" aria-label="Quitar serie">×</button><div class="set-extra ${expanded?'':'hidden'}"><label class="weight-override"><input type="checkbox" data-override ${override?'checked':''}> Peso diferente</label><label class="override-kg ${override?'':'hidden'}">kg<input data-prop="kg-override" type="number" min="0" max="1000" step="any" inputmode="decimal" value="${override?s.kg:''}"></label><label class="weight-override"><input type="checkbox" data-rir-override ${overrideRir?'checked':''}> ${effortLabel()} diferente</label><label class="override-rir ${overrideRir?'':'hidden'}">${effortLabel()}<input data-prop="rir-override" type="number" ${effortRange()} step="0.5" inputmode="decimal" value="${overrideRir?shownEffort(s.rir):''}"></label></div></div>`;
+}
+function readSideForm(row,side){
+ if(!row?.querySelector(`[data-side="${side}"]`))return null;
+ const r=row.querySelector(`[data-side="${side}"][data-field="rir"]`);
+ return {rir:r?.value.trim()?enteredRir(Number(r.value)):null};
 }
 function exerciseFrom(el){return day().exercises.find(e=>e.id===el.dataset.id)}
 function readCard(el){
@@ -156,7 +187,21 @@ function readCard(el){
  const kgInput=el.querySelector('[data-common="kg"]'),rirInput=el.querySelector('[data-common="rir"]');
  if(!kgInput.checkValidity()||!rirInput.checkValidity())throw Error('Revisá peso y '+effortLabel()+' general.');
  const kg=kgInput.value.trim()===''?null:Number(kgInput.value),rir=rirInput.value.trim()===''?null:enteredRir(Number(rirInput.value));
+ const unilateral=!!exerciseFrom(el)?.unilateral;
  const sets=rows.map(row=>{
+  if(unilateral){
+   const sides={};
+   for(const side of ['left','right']){
+    const find=key=>row.querySelector(`[data-side="${side}"][data-field="${key}"]`);
+    const repsEl=find('reps'),kgEl=find('kg'),rirEl=find('rir');
+    if(!repsEl.checkValidity()||!kgEl.checkValidity()||!rirEl.checkValidity())throw Error(`Revisá la serie de ${side==='left'?'izquierda':'derecha'}.`);
+    const reps=repsEl.value.trim()===''?null:Number(repsEl.value);
+    if(reps!==null&&!Number.isInteger(reps))throw Error('Las repeticiones deben ser enteras.');
+    sides[side]={kg:kgEl.value.trim()===''?kg:Number(kgEl.value),reps,rir:rirEl.value.trim()===''?rir:enteredRir(Number(rirEl.value))};
+   }
+   const same=(field)=>sides.left[field]===sides.right[field]?sides.left[field]:null;
+   return {kg:same('kg'),reps:same('reps'),rir:same('rir'),sides};
+  }
   const repsInput=row.querySelector('[data-prop="reps"]');
   const checked=row.querySelector('[data-override]').checked;
   const weightInput=row.querySelector('[data-prop="kg-override"]');
@@ -179,6 +224,12 @@ function modal(title,body){$('modalTitle').textContent=title;$('modalBody').inne
 function showExerciseHistory(e){const all=model.weeks.flatMap(w=>w.days.flatMap(d=>d.exercises.filter(x=>x.exerciseId===e.exerciseId&&x.updated).map(x=>({week:w.number,day:d.number,e:x})))).sort((a,b)=>b.week-a.week);modal('Historial · '+e.name,all.length?all.map(x=>`<div class="histitem"><b>Semana ${x.week} · Día ${x.day}</b><p>${escapeHtml(summary(x.e))}</p><div class="hist-series-list">${seriesDetail(x.e)}</div><p>${escapeHtml(x.e.notes||'Sin notas')}</p></div>`).join(''):'<p class="muted">Todavía no hay registros guardados de este ejercicio.</p>')}
 function guardDirty(){return !document.querySelector('[data-dirty="1"]')||confirm('Tenés cambios sin guardar. ¿Querés descartarlos?')}
 $('cards').addEventListener('change',ev=>{if(ev.target.matches('[data-override],[data-rir-override]')){const row=ev.target.closest('.set-row');const isRir=ev.target.matches('[data-rir-override]');const box=row.querySelector(isRir?'.override-rir':'.override-kg');box.classList.toggle('hidden',!ev.target.checked);if(ev.target.checked){const input=row.querySelector(isRir?'[data-prop=rir-override]':'[data-prop=kg-override]');if(!input.value)input.value=ev.target.closest('.card').querySelector(isRir?'[data-common=rir]':'[data-common=kg]').value;input.focus()}const changed=row.querySelector('[data-override]').checked||row.querySelector('[data-rir-override]').checked;row.querySelector('.adjust-btn').classList.toggle('changed',changed);row.querySelector('.adjust-btn').textContent=changed?'⚙ Ajustado':'⚙ Ajustar';const c=ev.target.closest('.card');c.dataset.workoutDirty='1';draftBadge(c)}});
+$('cards').addEventListener('change',ev=>{
+ if(ev.target.matches('[data-plan="unilateral"]')){
+  const card=ev.target.closest('.card');card.querySelector('.plan-panel').classList.toggle('editing-unilateral',ev.target.checked);
+  draftBadge(card);
+ }
+});
 $('cards').addEventListener('input',ev=>{
  const c=ev.target.closest('.card');if(!c)return;
  if(ev.target.matches('[data-plan="all-kg"]')){
@@ -244,10 +295,22 @@ if(a==='save-plan'){
  const sets=rows.map(row=>{
   const ri=row.querySelector('[data-plan-reps]'),ki=row.querySelector('[data-plan-kg]');
   if(!ri.checkValidity()||!ki.checkValidity())throw Error('Revisá las repeticiones y los pesos del objetivo.');
-  return {reps:ri.value.trim()===''?null:Number(ri.value),kg:ki.value.trim()===''?null:Number(ki.value)};
+  const general={reps:ri.value.trim()===''?null:Number(ri.value),kg:ki.value.trim()===''?null:Number(ki.value)};
+  if(c.querySelector('[data-plan="unilateral"]').checked){
+   general.sides={};
+   for(const side of ['left','right']){
+    const rep=row.querySelector(`[data-plan-side="${side}-reps"]`),weight=row.querySelector(`[data-plan-side="${side}-kg"]`);
+    if(!rep.checkValidity()||!weight.checkValidity())throw Error('Revisá los objetivos por lado.');
+    general.sides[side]={reps:rep.value.trim()===''?null:Number(rep.value),kg:weight.value.trim()===''?null:Number(weight.value)};
+   }
+  }
+  return general;
  });
  if(!sets.length||sets.length>30||!Number.isInteger(min)||min<1||!Number.isInteger(max)||max<min||max>200||!Number.isFinite(rir)||rir<0||rir>10||increment!==null&&(!Number.isFinite(increment)||increment<=0)||sets.some(x=>x.reps!==null&&(!Number.isInteger(x.reps)||x.reps<1||x.reps>200)||x.kg!==null&&(!Number.isFinite(x.kg)||x.kg<0||x.kg>1000)))throw Error('Revisá la planificación.');
- e.plan={sets,min,max,rir,increment,volumeEnabled:c.querySelector('[data-plan="volumeEnabled"]').checked,volumeCandidate:false,reason:'Objetivo personalizado'};
+ const wasUnilateral=!!e.unilateral, nowUnilateral=c.querySelector('[data-plan="unilateral"]').checked;
+  if(wasUnilateral!==nowUnilateral&&e.updated&&!confirm('Cambiar bilateral/unilateral en un ejercicio guardado requiere revisar y registrar nuevamente los datos por lado. Se conservarán los valores hasta que guardes de nuevo. ¿Continuar?'))return;
+  e.unilateral=nowUnilateral;
+  e.plan={sets,min,max,rir,increment,volumeEnabled:c.querySelector('[data-plan="volumeEnabled"]').checked,volumeCandidate:false,reason:'Objetivo personalizado'};
  await persist();render();
  const card=[...document.querySelectorAll('.card')].find(el=>el.dataset.id===e.id);
  if(card)card.open=true;
@@ -258,8 +321,8 @@ if(a==='fill-goal'){
  if(!planned.length||planned.some(x=>x.reps===null||x.kg===null||!Number.isFinite(Number(x.reps))||!Number.isFinite(Number(x.kg)))){
   alert('Para cargar el objetivo, primero definí el peso y las repeticiones de todas las series en «Editar objetivo».');return;
  }
- const hasData=[...c.querySelectorAll('.set-row [data-prop="reps"]')].some(x=>x.value.trim()!=='');
- if(hasData&&!confirm('Ya hay repeticiones cargadas. ¿Reemplazarlas por el objetivo planificado? El ${effortLabel()} no se modificará.'))return;
+ const hasData=[...c.querySelectorAll('.set-row [data-prop="reps"],.set-row [data-field="reps"]')].some(x=>x.value.trim()!=='');
+ if(hasData&&!confirm(`Ya hay repeticiones cargadas. ¿Reemplazarlas por el objetivo planificado? El ${effortLabel()} no se modificará.`))return;
  const sameWeight=planned.every(x=>Number(x.kg)===Number(planned[0].kg));
  const baseWeight=Number(planned[0].kg);
  c.querySelector('[data-common="kg"]').value=String(baseWeight);
@@ -267,13 +330,19 @@ if(a==='fill-goal'){
  const currentRir=c.querySelector('[data-common="rir"]').value.trim();
  const oldRows=[...c.querySelectorAll('.set-row')];
  const previous=oldRows.map(row=>({
-  rirOverride:row.querySelector('[data-rir-override]').checked,
-  rir:row.querySelector('[data-prop="rir-override"]').value.trim()
+  rirOverride:!!row.querySelector('[data-rir-override]')?.checked,
+  rir:row.querySelector('[data-prop="rir-override"]')?.value.trim()||''
  }));
  const html=planned.map((x,j)=>{
   const isDifferent=Number(x.kg)!==baseWeight;
   const saved=previous[j];
   const effectiveRir=saved?.rirOverride&&saved.rir!==''?enteredRir(Number(saved.rir)):currentRir===''?null:enteredRir(Number(currentRir));
+  if(e.unilateral){
+   const sides={};
+   for(const side of ['left','right']){const target=ObsidianaProgression.goalSide(x,side);const kept=oldRows[j]?readSideForm(oldRows[j],side):null;
+    sides[side]={kg:Number(target.kg),reps:Number(target.reps),rir:kept?.rir??null};}
+   return setHTML({kg:Number(x.kg),reps:Number(x.reps),rir:null,sides},j,baseWeight,currentRir===''?null:enteredRir(Number(currentRir)),true);
+  }
   return setHTML({kg:Number(x.kg),reps:Number(x.reps),rir:effectiveRir},j,baseWeight,currentRir===''?null:enteredRir(Number(currentRir)));
  }).join('');
  c.querySelector('.setrows').innerHTML=html;
@@ -292,7 +361,7 @@ if(a==='fill-goal'){
  c.querySelector('.status').textContent='Objetivo cargado · completá el '+effortLabel()+' y guardá el registro';
  return;
 }
-if(a==='save'){await saveCard(c);return}if(a==='history'){showExerciseHistory(e);return}if(a==='delete-exercise'){if(!confirm('¿Eliminar este ejercicio de esta semana?'))return;day().exercises=day().exercises.filter(x=>x.id!==e.id);await persist();render();return}if(a==='add-set'||a==='remove-set'){const rows=c.querySelector('.setrows'),current=readCard(c);if(a==='add-set'){if(current.sets.length>=30){alert('Máximo 30 series.');return}current.sets.push({kg:null,reps:null,rir:null})}else{if(current.sets.length<=1)return;const index=Number(b.dataset.index);if(current.sets[index].reps!==null&&!confirm('¿Quitar esta serie?'))return;current.sets.splice(index,1)}const base=c.querySelector('[data-common=kg]').value.trim()===''?null:Number(c.querySelector('[data-common=kg]').value);const baseRir=c.querySelector('[data-common=rir]').value.trim()===''?null:enteredRir(Number(c.querySelector('[data-common=rir]').value));rows.innerHTML=current.sets.map((s,j)=>setHTML(s,j,base,baseRir)).join('');c.dataset.workoutDirty='1';draftBadge(c)}}catch(err){alert(err.message)}});
+if(a==='save'){await saveCard(c);return}if(a==='history'){showExerciseHistory(e);return}if(a==='delete-exercise'){if(!confirm('¿Eliminar este ejercicio de esta semana?'))return;day().exercises=day().exercises.filter(x=>x.id!==e.id);await persist();render();return}if(a==='add-set'||a==='remove-set'){const rows=c.querySelector('.setrows'),current=readCard(c);if(a==='add-set'){if(current.sets.length>=30){alert('Máximo 30 series.');return}current.sets.push(e.unilateral?{kg:null,reps:null,rir:null,sides:{left:{kg:null,reps:null,rir:null},right:{kg:null,reps:null,rir:null}}}:{kg:null,reps:null,rir:null})}else{if(current.sets.length<=1)return;const index=Number(b.dataset.index);if((current.sets[index].reps!==null||current.sets[index].sides?.left?.reps!==null&&current.sets[index].sides?.left?.reps!==undefined||current.sets[index].sides?.right?.reps!==null&&current.sets[index].sides?.right?.reps!==undefined)&&!confirm('¿Quitar esta serie?'))return;current.sets.splice(index,1)}const base=c.querySelector('[data-common=kg]').value.trim()===''?null:Number(c.querySelector('[data-common=kg]').value);const baseRir=c.querySelector('[data-common=rir]').value.trim()===''?null:enteredRir(Number(c.querySelector('[data-common=rir]').value));rows.innerHTML=current.sets.map((s,j)=>setHTML(s,j,base,baseRir,!!e.unilateral)).join('');c.dataset.workoutDirty='1';draftBadge(c)}}catch(err){alert(err.message)}});
 $('effortScale').onchange=async ev=>{
  const next=ev.target.value==='rpe'?'rpe':'rir';
  if(!guardDirty()){ev.target.value=effortScale();return;}
@@ -312,7 +381,7 @@ $('deleteOptions').addEventListener('click',ev=>{if(ev.target.closest('button'))
 $('deleteDay').onclick=async()=>{if(!guardDirty())return;const w=week(),d=day();if(w.days.length<=1){alert('Debe quedar al menos un día en la semana.');return}const count=d.exercises.filter(x=>x.updated).length;const msg=count?`Este día tiene ${count} ejercicio(s) guardado(s). Eliminarlo BORRARÁ sus registros de esta semana. No se tocarán otras semanas. ¿Continuar?`:`¿Eliminar «${d.name||'Día '+d.number}» de la semana actual?`;if(!confirm(msg))return;const before=w.days.slice(),previous=currentDay;w.days=w.days.filter(x=>x!==d);currentDay=w.days[Math.min(before.indexOf(d),w.days.length-1)].number;try{await persist();render()}catch(err){w.days=before;currentDay=previous;alert('No se pudo eliminar: '+err.message)}};
 const LIBRARY=['Press de banca','Press inclinado','Press inclinado Hammer','Press militar','Aperturas en polea','Peck deck','Fondos','Jalón al pecho','Dominadas','Remo con barra','Remo con mancuerna','Remo en máquina','Remo con soporte pectoral','Pullover en polea','Curl con barra','Curl inclinado','Curl martillo','Curl predicador','Curl bayesiano','Extensión de tríceps en polea','Tríceps katana','Sentadilla','Sentadilla hack','Prensa 45°','Extensión de cuádriceps','Curl femoral sentado','Peso muerto rumano','Hip thrust','Gemelos de pie','Gemelos sentado','Elevaciones laterales','Pájaros','Peck deck reverso','Abdominales en polea','Plancha'];
 function exerciseNames(){return [...new Set([...LIBRARY,...model.weeks.flatMap(w=>w.days.flatMap(d=>d.exercises.map(e=>e.name)))])].sort((a,b)=>a.localeCompare(b,'es'))}
-async function createExercise(name){const clean=String(name||'').trim().slice(0,150);if(!clean){alert('Ingresá un nombre.');return}if(day().exercises.length>=200){alert('Máximo 200 ejercicios por día.');return}const same=model.weeks.flatMap(w=>w.days.flatMap(d=>d.exercises)).find(e=>e.name.toLocaleLowerCase()===clean.toLocaleLowerCase());const e={id:uid(),exerciseId:same?.exerciseId||uid(),name:clean,videoUrl:same?.videoUrl||'',plan:{sets:[{kg:null,reps:10},{kg:null,reps:10},{kg:null,reps:10}],min:8,max:12,rir:1,increment:null},sets:[{kg:null,reps:null,rir:null},{kg:null,reps:null,rir:null},{kg:null,reps:null,rir:null}],notes:'',updated:null};day().exercises.push(e);try{await persist();$('overlay').classList.remove('open');render()}catch(err){day().exercises.pop();alert('No se pudo crear: '+err.message)}}
+async function createExercise(name){const clean=String(name||'').trim().slice(0,150);if(!clean){alert('Ingresá un nombre.');return}if(day().exercises.length>=200){alert('Máximo 200 ejercicios por día.');return}const same=model.weeks.flatMap(w=>w.days.flatMap(d=>d.exercises)).find(e=>e.name.toLocaleLowerCase()===clean.toLocaleLowerCase());const e={id:uid(),exerciseId:same?.exerciseId||uid(),name:clean,videoUrl:same?.videoUrl||'',unilateral:!!same?.unilateral,plan:{sets:[{kg:null,reps:10},{kg:null,reps:10},{kg:null,reps:10}],min:8,max:12,rir:1,increment:null},sets:[{kg:null,reps:null,rir:null},{kg:null,reps:null,rir:null},{kg:null,reps:null,rir:null}],notes:'',updated:null};if(e.unilateral){e.sets=e.sets.map(s=>({...s,sides:{left:{kg:null,reps:null,rir:null},right:{kg:null,reps:null,rir:null}}}))}day().exercises.push(e);try{await persist();$('overlay').classList.remove('open');render()}catch(err){day().exercises.pop();alert('No se pudo crear: '+err.message)}}
 $('addExercise').onclick=()=>{if(!guardDirty())return;modal('Agregar ejercicio',`<p class="muted">Elegí uno de la lista o escribí uno propio.</p><input id="exerciseQuery" type="search" placeholder="Buscar o escribir ejercicio" maxlength="150" style="width:100%;margin-bottom:12px" aria-label="Buscar ejercicio"><div id="exerciseSuggestions" style="max-height:280px;overflow:auto"></div><div class="row" style="margin-top:12px"><button class="button primary small" id="createCustomExercise">+ Agregar el nombre escrito</button></div>`);const input=$('exerciseQuery');const draw=()=>{const q=input.value.toLocaleLowerCase().trim();const names=exerciseNames().filter(n=>n.toLocaleLowerCase().includes(q)).slice(0,35);$('exerciseSuggestions').innerHTML=names.map((n,i)=>`<button class="button small exercise-choice" data-name-index="${i}" style="display:block;width:100%;text-align:left;margin:4px 0">${escapeHtml(n)}</button>`).join('')||'<p class="muted">Sin coincidencias. Podés agregar tu ejercicio.</p>';window._obsSuggestions=names};input.addEventListener('input',draw);draw();input.focus()};
 $('modalBody').addEventListener('click',async ev=>{const choice=ev.target.closest('[data-name-index]');if(choice){await createExercise(window._obsSuggestions[Number(choice.dataset.nameIndex)]);return}if(ev.target.closest('#createCustomExercise')){await createExercise($('exerciseQuery').value)}});
 
@@ -351,7 +420,7 @@ async function makeWeek(mode){
      const original=previous?.days.flatMap(day=>day.exercises).find(x=>x.exerciseId===e.exerciseId);
      plan=original?proposal(original,mode==='auto'?'auto':'manual'):proposal(e,'manual');
    }else plan=proposal(e,mode);
-   return {id:uid(),exerciseId:e.exerciseId,name:e.name,videoUrl:e.videoUrl||'',plan,sets:plan.sets.map(()=>({kg:null,reps:null,rir:null})),notes:'',updated:null};
+   return {id:uid(),exerciseId:e.exerciseId,name:e.name,videoUrl:e.videoUrl||'',unilateral:!!e.unilateral,plan,sets:plan.sets.map(()=>e.unilateral?({kg:null,reps:null,rir:null,sides:{left:{kg:null,reps:null,rir:null},right:{kg:null,reps:null,rir:null}}}):({kg:null,reps:null,rir:null})),notes:'',updated:null};
  })}))};
  const oldWeek=currentWeek,oldDay=currentDay;
  model.weeks.push(nw);currentWeek=next;currentDay=nw.days[0].number;

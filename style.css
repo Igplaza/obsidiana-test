@@ -398,3 +398,22 @@ input::placeholder,textarea::placeholder{color:#85909E}
 .compare-table tbody td:nth-child(4){color:#85dccc;font-weight:650}
 .compare-table .cmp-delta{font-weight:700;color:#59d2bc}
 @media(max-width:520px){.compare-table{font-size:11px}.compare-table th,.compare-table td{padding:9px 7px}}
+
+/* Obsidiana v3.8 — objetivos y registro unilateral */
+.plan-edit .unilateral-toggle{grid-column:1/-1;display:flex;align-items:center;gap:9px;font-weight:700;color:#D4C1E8;font-size:12px;background:#141820;border:1px solid #A77BE84A;border-radius:10px;padding:12px}
+.unilateral-toggle input{width:19px;min-height:19px;accent-color:var(--purple);flex:0 0 auto}
+.plan-side-targets{display:none;grid-column:1/-1;gap:5px;margin:3px 0 8px;padding:8px;background:#151922;border-radius:9px;border:1px solid #ffffff17}
+.editing-unilateral .plan-side-targets{display:grid;grid-template-columns:1fr 1fr}
+.plan-side-target{min-width:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px}
+.plan-side-target>b{grid-column:1/-1;font-size:11px;color:#D7CAE9}
+.plan-side-target input{font-size:13px;min-width:0;padding:5px}
+.unilateral-set-row{grid-template-columns:23px minmax(0,1fr) 24px;align-items:start}
+.unilateral-set-row .unilateral-pair{grid-column:2;display:flex;flex-direction:column;gap:9px;width:100%;min-width:0}
+.unilateral-side{display:grid;grid-template-columns:minmax(80px,1.2fr) repeat(3,minmax(0,1fr));align-items:center;gap:6px;background:#151920;border:1px solid #ffffff1c;border-radius:10px;padding:8px}
+.unilateral-side>b{font-size:11px;color:#C7A6EB}
+.unilateral-side label{display:flex;flex-direction:column;min-width:0;gap:3px;font-size:10px}
+.unilateral-side input{font-size:14px;min-height:38px;width:100%;padding:4px 2px}
+.unilateral-set-row .remove{grid-column:3;grid-row:1}
+.hist-series.unilateral-hist{grid-template-columns:38px 1fr 1fr;gap:4px}
+.hist-series.unilateral-hist span{font-size:11px}
+@media(max-width:480px){.unilateral-side{grid-template-columns:1fr 1fr 1fr;gap:5px}.unilateral-side>b{grid-column:1/-1}.unilateral-side label{font-size:10px}.unilateral-set-row{grid-template-columns:21px minmax(0,1fr) 19px;gap:4px}.editing-unilateral .plan-side-targets{grid-template-columns:1fr}.plan-side-target{grid-template-columns:1fr 1fr}.plan-side-target>b{grid-column:1/-1}}

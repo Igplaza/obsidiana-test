@@ -14,7 +14,9 @@ const val=x=>x===null||x===undefined||x===''||!Number.isFinite(Number(x))?'--':S
 const fmtNum=x=>Number.isFinite(Number(x))?Number(x).toLocaleString('es-AR',{maximumFractionDigits:1}):'--';
 const dt=x=>{const d=new Date(x||Date.now());return Number.isFinite(d.getTime())?d.toLocaleDateString('es-AR'):'Sin fecha'};
 const effortText=x=>{const n=Number(x);if(x==null||x===''||!Number.isFinite(n))return '--';return String(Math.round((10-n)*2)/2)};
-const isDone=s=>Array.isArray(s)&&s.length>0&&s.every(z=>z.kg!==null&&z.kg!==undefined&&z.kg!==''&&Number.isFinite(Number(z.kg))&&Number(z.reps)>0&&z.rir!==null&&z.rir!==undefined&&z.rir!==''&&Number.isFinite(Number(z.rir)));
+const doneSet=z=>z&&z.kg!==null&&z.kg!==undefined&&Number.isFinite(Number(z.kg))&&Number(z.reps)>0&&z.rir!==null&&z.rir!==undefined&&Number.isFinite(Number(z.rir));
+const isDone=(sets,unilateral=false)=>Array.isArray(sets)&&sets.length>0&&sets.every(z=>unilateral?doneSet(z.sides?.left)&&doneSet(z.sides?.right):doneSet(z));
+const rowsFor=e=>(e.updated?e.sets||[]:[]).flatMap((s,i)=>e.unilateral?['left','right'].map(side=>({...s.sides?.[side],_label:`${i+1} ${side==='left'?'Izq.':'Der.'}`})):[{...s,_label:String(i+1)}]);
 function widthOf(s,size,bold){let w=0;for(const c of latin(s)){if('ilI.,:;!\'|'.includes(c))w+=.27;else if('MW@#%'.includes(c))w+=.82;else if(c===' ')w+=.27;else w+=bold?.60:.52;}return w*size;}
 function fit(s,px,size=10,bold=false){const raw=latin(s).replace(/\n/g,' ');if(widthOf(raw,size,bold)<=px)return raw;let t=raw;while(t.length>1&&widthOf(t+'...',size,bold)>px)t=t.slice(0,-1);return t+'...'}
 function wrap(value,maxwidth,size=9,bold=false){
@@ -43,7 +45,7 @@ function buildReport(input){
  for(const d of days)for(const e of d.items){
   exerciseCount++;plannedCount+=(e.plan?.sets||[]).length;
   if(!e.updated)continue;
-  for(const s of (e.sets||[])){
+  for(const s of rowsFor(e)){
    if(s.kg===null||s.kg===undefined||!Number.isFinite(Number(s.kg))||!Number.isFinite(Number(s.reps))||Number(s.reps)<=0)continue;
    setCount++;volume+=Number(s.kg)*Number(s.reps);
   }
@@ -71,7 +73,7 @@ function buildReport(input){
  }
  function room(h){if(cy-h<BOTTOM)page()}
  function badge(e,x,y){
-  const done=!!e.updated&&isDone(e.sets),planned=!e.updated;
+  const done=!!e.updated&&isDone(e.sets,!!e.unilateral),planned=!e.updated;
   const label=planned?'PLANIFICADO':done?'COMPLETO':'PARCIAL';
   const bg=planned?C.purplePale:done?C.greenPale:C.amberPale;
   const fg=planned?'#69489F':done?C.green:C.amber;
@@ -93,7 +95,7 @@ function buildReport(input){
  }
  function planned(e){
   if(!Array.isArray(e.plan?.sets)||!e.plan.sets.length)return ['Sin objetivo planificado'];
-  const v=e.plan.sets.map((s,i)=>`S${i+1} ${val(s.reps)} reps / ${val(s.kg)} kg`).join('   |   ');
+  const v=e.plan.sets.map((s,i)=>{if(!e.unilateral)return `S${i+1} ${val(s.reps)} reps / ${val(s.kg)} kg`;return `S${i+1}: Izq. ${val(s.sides?.left?.reps??s.reps)} reps / ${val(s.sides?.left?.kg??s.kg)} kg, Der. ${val(s.sides?.right?.reps??s.reps)} reps / ${val(s.sides?.right?.kg??s.kg)} kg`}).join('   |   ');
   const eff=e.plan.rir===null||e.plan.rir===undefined?'':`   |   RIR ${val(e.plan.rir)} / RPE ${effortText(e.plan.rir)}`;
   return wrap(v+eff,W-38,8.8);
  }
@@ -128,7 +130,7 @@ function buildReport(input){
    const y=headY-23-(i+1)*ROW_H;
    if(i%2===0)rectangle(L+13,y,W-26,ROW_H,C.bg);
    const idx=(opts.start||0)+i+1;
-   const cells=[String(idx),`${val(s.kg)} kg`,String(val(s.reps)),val(s.rir),effortText(s.rir)];
+   const cells=[s._label||String(idx),`${val(s.kg)} kg`,String(val(s.reps)),val(s.rir),effortText(s.rir)];
    cells.forEach((v,k)=>txt(fit(v,k===1?99:75,9,k===0),cols[k],y+7,9,k===0,k===0?C.purple:C.ink));
   });
   let tail=headY-23-Math.max(1,rows.length)*ROW_H-11;
@@ -145,7 +147,7 @@ function buildReport(input){
   rounded(L,top-h,W,h,8,C.bg,C.line);txt(fit(kind+' - '+title,W-32,9,true),L+14,top-20,9,true,C.purple);lines(linesText,L+14,top-36,8.8,C.slate,12);cy-=h+9;
  }
  function renderExercise(e){
-  const all=e.updated&&Array.isArray(e.sets)?e.sets:[];
+  const all=rowsFor(e);
   const name=e.name||'Ejercicio';let idx=0;
   // Si un ejercicio completo entra en una página, no lo partimos entre hojas.
   const goalAll=planned(e);
