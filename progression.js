@@ -1,4 +1,4 @@
-/* Obsidiana · Progresión v6.
+/* Obsidiana · Progresión v7.
    Recomendaciones orientativas, conservadoras y editables; no sustituyen al entrenador.
    Almacenamiento interno de esfuerzo: RIR. RPE fuerza = 10 - RIR. */
 (function(root){
@@ -36,10 +36,45 @@ function inspectRecord(source){
  return {ready:true,kind:'ready',reason:''};
 }
 function eligiblePast(h,reference){return !!h?.updated&&Array.isArray(h.sets)&&h.sets.length===reference.sets.length&&h.sets.every((s,i)=>n(s.reps)!==null&&n(s.rir)!==null&&close(s.kg,reference.sets[i].kg))}
+// Solo normalizamos propuestas automáticas. Objetivos manuales y registros reales
+// pueden tener cualquier secuencia de reps: nunca se corrigen retroactivamente.
+function normalizeSameLoad(sets){
+ const result=copy(sets);
+ for(let i=1;i<result.length;i++){
+  const before=result[i-1],current=result[i];
+  if(close(before.kg,current.kg)&&n(before.reps)!==null&&n(current.reps)!==null&&current.reps>before.reps){
+   current.reps=before.reps;
+  }
+ }
+ return result;
+}
+function sameProposal(a,b){return JSON.stringify(a)===JSON.stringify(b)}
+// En un unilateral una diferencia EXPLICITA de carga en cualquiera de los dos
+// lados permite diferente cantidad de repeticiones entre esas series.
+function normalizeUnilateralSets(sets){
+ const result=copy(sets);
+ for(let i=1;i<result.length;i++){
+  const a=result[i-1],b=result[i];
+  if(['left','right'].every(side=>close(a.sides?.[side]?.kg,b.sides?.[side]?.kg)) &&
+    n(a.reps)!==null&&n(b.reps)!==null&&b.reps>a.reps){
+   b.reps=a.reps;
+   for(const side of ['left','right'])b.sides[side].reps=b.reps;
+  }
+ }
+ return result;
+}
 function oneSide(source,mode,history=[]){
  const p=source.plan||{};
  const old=(p.sets||[]).map(s=>({kg:s.kg??null,reps:s.reps??null}));
- const ret=(sets,reason,extra={})=>({...p,sets,reason,volumeCandidate:false,...extra});
+ let autoReady=false;
+ const ret=(sets,reason,extra={})=>{
+  const planned=autoReady?normalizeSameLoad(sets):sets;
+  if(autoReady&&!sameProposal(planned,sets)){
+   const accurate=reason.startsWith('Progresamos')?describeRepetitionProgress(source.sets,planned):null;
+   reason=accurate||`Objetivo ordenado · ajustamos reps a una secuencia descendente (${sets.map(x=>x.reps).join('-')} → ${planned.map(x=>x.reps).join('-')})`;
+  }
+  return {...p,sets:planned,reason,volumeCandidate:false,...extra};
+ };
  if(mode==='manual')return ret(old,'Objetivo manual · editable');
  if(mode==='deload')return ret(old.slice(0,Math.max(1,Math.ceil(old.length/2))),
   'Descarga · menos series, más margen',{rir:Math.max(3.5,p.rir??1)});
@@ -55,6 +90,7 @@ function oneSide(source,mode,history=[]){
  const performed=source.sets,min=n(p.min)??8,max=n(p.max)??12,target=n(p.rir)??1;
  if(max<min||min<1)return ret(old,'Cambiaste series o cargas · revisá el objetivo antes de continuar',
   {requiresReview:true,reviewKind:'range',reviewDetail:'El rango de repeticiones no es válido'});
+ autoReady=true;
  const actual=performed.map(s=>({kg:s.kg,reps:s.reps}));
  const minRir=Math.min(...performed.map(s=>s.rir));
  const missed=performed.some((s,i)=>s.reps<old[i].reps);
@@ -109,8 +145,21 @@ function sideSource(source,side){return {
  plan:{...source.plan,sets:(source.plan.sets||[]).map(s=>goalSide(s,side))},
  sets:(source.sets||[]).map(s=>sideData(s,side)||{kg:null,reps:null,rir:null})
 };}
-function propose(source,mode,history=[]){
- if(!source?.unilateral)return oneSide(source,mode,history);
+// Para unilateral la progresión se decide a partir del registro MENOS favorable
+// de ambos lados (reps mínimas, RIR mínimo). No se promedian resultados.
+// Las cargas pueden seguir siendo distintas por lado; la propuesta de reps es común.
+function unilateralReference(source){
+ const p=source.plan||{};
+ const sets=(source.sets||[]).map((set,i)=>{
+  const l=sideData(set,'left'),r=sideData(set,'right');
+  const pl=goalSide(p.sets[i],'left'),pr=goalSide(p.sets[i],'right');
+  const leftLimits=Number(l.kg)<=Number(r.kg);
+  return {goal:{kg:leftLimits?pl.kg:pr.kg,reps:Math.min(pl.reps,pr.reps)},
+   actual:{kg:leftLimits?l.kg:r.kg,reps:Math.min(l.reps,r.reps),rir:Math.min(l.rir,r.rir)}};
+ });
+ return {updated:source.updated,plan:{...p,sets:sets.map(x=>x.goal)},sets:sets.map(x=>x.actual)};
+}
+function proposedUnilateral(source,mode,history=[]){
  const p=source.plan||{};
  if(mode==='manual')return {...copy(p),reason:'Objetivo manual · editable',volumeCandidate:false};
  if(mode==='deload'){
@@ -119,17 +168,44 @@ function propose(source,mode,history=[]){
  }
  const diagnosis=inspectRecord(source);
  if(!diagnosis.ready)return {...copy(p),reason:diagnosis.reason,requiresReview:true,reviewKind:diagnosis.kind,volumeCandidate:false};
- const left=oneSide(sideSource(source,'left'),'auto',history.map(h=>sideSource(h,'left')));
- const right=oneSide(sideSource(source,'right'),'auto',history.map(h=>sideSource(h,'right')));
- const combined=p.sets.map((s,i)=>{
-  const l=left.sets[i],r=right.sets[i];
-  return {...s,kg:close(l.kg,r.kg)?l.kg:s.kg,reps:l.reps===r.reps?l.reps:s.reps,
-   sides:{left:{kg:l.kg,reps:l.reps},right:{kg:r.kg,reps:r.reps}}};
+ const reference=unilateralReference(source);
+ // Si cualquiera de los lados cambió la carga respecto de SU objetivo, no
+ // incrementamos automáticamente; la próxima sesión parte del peso real.
+ const deviated=source.sets.some((set,i)=>['left','right'].some(side=>
+  !close(sideData(set,side).kg,goalSide(p.sets[i],side).kg)));
+ let calculated;
+ if(deviated){
+  calculated={sets:reference.sets.map(x=>({kg:x.kg,reps:x.reps})),
+   reason:'Cambiaste series o cargas · revisá el objetivo antes de continuar',
+   reviewKind:'weightAdjusted'};
+ }else calculated=oneSide(reference,'auto',history.filter(x=>x?.unilateral&&inspectRecord(x).ready).map(unilateralReference));
+ const current=reference.sets;
+ const resultSets=(p.sets||[]).map((old,i)=>{
+  const performed=source.sets[i];
+  const newCommon=calculated.sets[i];
+  const raisedKg=n(newCommon.kg)!==null&&n(current[i].kg)!==null
+   &&newCommon.kg>current[i].kg;
+  const increment=raisedKg?newCommon.kg-current[i].kg:0;
+  const leftKg=Math.round((sideData(performed,'left').kg+increment)*100)/100;
+  const rightKg=Math.round((sideData(performed,'right').kg+increment)*100)/100;
+  const reps=newCommon.reps;
+  return {...old,kg:close(leftKg,rightKg)?leftKg:Math.max(leftKg,rightKg),reps,
+   sides:{left:{kg:leftKg,reps},right:{kg:rightKg,reps}}};
  });
- return {...copy(p),sets:combined,volumeCandidate:false,
-  reason:'Izquierda: '+left.reason+' · Derecha: '+right.reason,
-  requiresReview:!!(left.requiresReview||right.requiresReview),
-  requiresWeightReview:!!(left.requiresWeightReview||right.requiresWeightReview)};
+ const planned=normalizeUnilateralSets(resultSets);
+ const changed=!sameProposal(planned,resultSets);
+ const reason=changed&&calculated.reason.startsWith('Progresamos')
+  ?'Objetivo ordenado · ajustamos repeticiones para evitar series ascendentes'
+  :calculated.reason;
+ return {...copy(p),sets:planned,volumeCandidate:false,
+  reason:'Ambos lados · '+reason,
+  requiresReview:!!calculated.requiresReview,
+  reviewKind:calculated.reviewKind,
+  requiresWeightReview:!!calculated.requiresWeightReview};
+}
+function propose(source,mode,history=[]){
+ if(!source?.unilateral)return oneSide(source,mode,history);
+ return proposedUnilateral(source,mode,history);
 }
 // Etiqueta precisa de mejoras reales, también para semanas ya creadas.
 function describeRepetitionProgress(previous,next){
