@@ -586,7 +586,66 @@ $('export').onclick=async()=>{
  }finally{button.disabled=false}
 };$('import').onclick=()=>{if(guardDirty())$('importFile').click()};$('importFile').onchange=async ev=>{const f=ev.target.files[0];if(!f)return;try{if(f.size>10*1024*1024)throw Error('Archivo demasiado grande.');const obj=JSON.parse(await f.text());validate(obj);if(!confirm('¿Reemplazar todos los datos locales con este respaldo? Exportá una copia primero.'))return;model=obj;currentWeek=model.weeks[0].number;currentDay=model.weeks[0].days[0].number;await persist();render();alert('Respaldo importado.')}catch(err){alert('No se pudo importar: '+err.message)}finally{ev.target.value=''}};
 $('closeModal').onclick=()=>$('overlay').classList.remove('open');$('overlay').onclick=ev=>{if(ev.target===$('overlay'))$('overlay').classList.remove('open')};
-let duration=120,remaining=120,deadline=null;function timerRender(){const n=deadline?Math.max(0,Math.ceil((deadline-Date.now())/1000)):remaining;const t=String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');$('timer').textContent=t;$('mobileTimer').textContent=t;$('timerToggle').textContent=deadline?'Pausar':'Iniciar';$('mobileToggle').textContent=deadline?'Pausar':'Iniciar';if(deadline&&n===0){deadline=null;remaining=0;try{navigator.vibrate?.([150,90,150])}catch(_){}}}function toggle(){if(deadline){remaining=Math.max(0,Math.ceil((deadline-Date.now())/1000));deadline=null}else{if(remaining<=0)remaining=duration;deadline=Date.now()+remaining*1000}timerRender()}function reset(){remaining=duration;deadline=null;timerRender()}$('timerToggle').onclick=$('mobileToggle').onclick=toggle;$('timerReset').onclick=$('mobileReset').onclick=reset;$('duration').onchange=e=>{duration=Number(e.target.value);$('mobileDuration').value=String(duration);reset()};$('mobileDuration').onchange=e=>{duration=Number(e.target.value);$('duration').value=String(duration);reset()};setInterval(timerRender,500);document.addEventListener('visibilitychange',timerRender);
+// Temporizador: dos notas breves al completar el descanso.
+// Inicializar el audio al tocar "Iniciar" evita el bloqueo de reproducción
+// sin interacción del usuario en Safari/iOS y WebView Android.
+let timerAudioContext=null;
+function enableTimerAudio(){
+  try{
+    const AC=window.AudioContext||window.webkitAudioContext;
+    if(!AC)return;
+    if(!timerAudioContext)timerAudioContext=new AC();
+    if(timerAudioContext.state==='suspended'){
+      const r=timerAudioContext.resume();
+      if(r&&typeof r.catch==='function')r.catch(()=>{});
+    }
+  }catch(_){/* El temporizador también funciona sin sonido. */}
+}
+function timerFinishedSound(){
+  try{
+    const ctx=timerAudioContext;
+    if(!ctx||ctx.state!=='running')return;
+    const now=ctx.currentTime;
+    for(const [hz,offset,length] of [[660,0,.20],[880,.17,.29]]){
+      const osc=ctx.createOscillator(),volume=ctx.createGain();
+      osc.type='sine';
+      osc.frequency.setValueAtTime(hz,now+offset);
+      volume.gain.setValueAtTime(.0001,now+offset);
+      volume.gain.exponentialRampToValueAtTime(.09,now+offset+.025);
+      volume.gain.exponentialRampToValueAtTime(.0001,now+offset+length);
+      osc.connect(volume);volume.connect(ctx.destination);
+      osc.start(now+offset);osc.stop(now+offset+length+.01);
+    }
+  }catch(_){/* Fallo de audio: no interrumpe el entrenamiento. */}
+}
+let duration=120,remaining=120,deadline=null;
+function timerRender(){
+  const n=deadline?Math.max(0,Math.ceil((deadline-Date.now())/1000)):remaining;
+  const t=String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');
+  $('timer').textContent=t;$('mobileTimer').textContent=t;
+  $('timerToggle').textContent=deadline?'Pausar':'Iniciar';
+  $('mobileToggle').textContent=deadline?'Pausar':'Iniciar';
+  if(deadline&&n===0){
+    deadline=null;remaining=0;
+    timerFinishedSound();
+    try{navigator.vibrate?.([150,90,150])}catch(_){}
+  }
+}
+function toggle(){
+  if(deadline){remaining=Math.max(0,Math.ceil((deadline-Date.now())/1000));deadline=null}
+  else{
+    enableTimerAudio();
+    if(remaining<=0)remaining=duration;
+    deadline=Date.now()+remaining*1000;
+  }
+  timerRender();
+}
+function reset(){remaining=duration;deadline=null;timerRender()}
+$('timerToggle').onclick=$('mobileToggle').onclick=toggle;
+$('timerReset').onclick=$('mobileReset').onclick=reset;
+$('duration').onchange=e=>{duration=Number(e.target.value);$('mobileDuration').value=String(duration);reset()};
+$('mobileDuration').onchange=e=>{duration=Number(e.target.value);$('duration').value=String(duration);reset()};
+setInterval(timerRender,500);document.addEventListener('visibilitychange',timerRender);
 window.addEventListener('beforeunload',event=>{if(document.querySelector('[data-dirty="1"]')){event.preventDefault();event.returnValue=''}});
 let resolveObsidianaReady;
 window.obsidianaReady=new Promise(resolve=>{resolveObsidianaReady=resolve});
