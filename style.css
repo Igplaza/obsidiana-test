@@ -666,3 +666,65 @@ label {color:#a5aebc}
 }
 @media(prefers-reduced-motion:reduce) { .button,.day,.progress>div {transition:none!important} }
 
+
+
+/* Obsidiana 4.1 · jerarquía, estado de días y ajustes unilaterales fuera de la tarjeta */
+.day{position:relative;padding-right:17px;transition:background-color .15s,border-color .15s,box-shadow .15s}
+.day.is-complete:not(.active){border-color:#377b6b;background:#172922;box-shadow:inset 0 0 0 1px #377b6b55}
+.day.is-complete:not(.active) small{color:#8bdcc4}
+.day.active{border-color:#b391ee;box-shadow:inset 0 0 0 1px #916bc5,0 0 0 1px #8c6bc12b}
+.day.active.is-complete{background:#282234}
+.day .obs-day-done-mark{position:absolute;right:8px;top:8px;display:grid;place-items:center;width:19px;height:19px;border-radius:50%;color:#0e211c;background:#76d4b1;font-weight:800;font-size:12px}
+.day.is-complete:not(.active) .obs-day-done-mark{background:#315a4f;color:#a2efd6}
+.card{margin:9px 0;border-color:#2e3742;border-radius:14px}
+.card summary{min-height:66px;padding:12px 14px}
+.card summary>.title b{letter-spacing:-.014em}
+.card.complete{border-color:#34483f}
+.card.complete .count{background:#19382e;border-color:#3e7867;color:#71dabb}
+.card .body{border-top-color:#2e3640}
+.plan-panel{border-color:#363d49;background:#20252d}
+.plan-tools .button.small{min-height:33px}
+.top{gap:12px}
+.top .auth-area{max-width:52%}
+.top .auth-detail{font-size:10px;max-width:100%;overflow-wrap:anywhere}
+.workspace-bar{border-color:#2c3541}
+.obs-day-view-btn.button.small{font-size:12px}
+/* La vista por lado ya no se despliega dentro de las filas. Se conservan los inputs para guardar. */
+.set-row .side-exception-panel,.plan-set-row .plan-side-targets{display:none!important}
+.plan-side-controls .button{font-size:11px}
+.obs-side-edit-open{overflow:hidden}
+.obs-side-editor-overlay[hidden]{display:none!important}
+.obs-side-editor-overlay{position:fixed;inset:0;z-index:150;display:grid;place-items:center;padding:18px;background:#080a10e0;backdrop-filter:blur(6px)}
+.obs-side-editor{width:min(100%,420px);max-height:calc(100dvh - 40px);overflow-y:auto;background:#20252e;border:1px solid #5b5269;border-radius:20px;padding:21px;box-shadow:0 26px 90px #000b}
+.obs-side-editor-head{display:flex;justify-content:space-between;align-items:start;gap:12px}
+.obs-side-editor-head small{font-size:10px;color:#b39ade;font-weight:750;letter-spacing:.09em}
+.obs-side-editor-head h3{font-size:21px;margin:7px 0 0;letter-spacing:-.03em;color:#f3f4f7}
+.obs-side-close{height:37px;width:37px;font-size:26px;line-height:1;border:1px solid #39424e;background:#292f3a;color:#d9dee7;border-radius:11px;cursor:pointer}
+.obs-side-editor-info{color:#b7c1ce;font-size:13px;line-height:1.55;margin:15px 0}
+.obs-side-selector{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:13px 0 16px;padding:4px;border-radius:12px;background:#151921}
+.obs-side-selector button{border:0;border-radius:9px;min-height:43px;background:transparent;color:#bac2ce;font-weight:650;cursor:pointer}
+.obs-side-selector button.is-selected{background:#4b3865;color:#fff;box-shadow:inset 0 0 0 1px #a78be0}
+.obs-side-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.obs-side-fields label{font-size:12px;color:#c8d1de;display:grid;gap:7px;min-width:0}
+.obs-side-fields input{min-width:0;width:100%;font-size:17px;text-align:center;min-height:49px;color:#f6f4f9;background:#10151d;border:1px solid #3c4655;border-radius:11px;padding:8px 5px;font-variant-numeric:tabular-nums}
+.obs-side-fields input:focus{border-color:#b491e7;outline:2px solid #8662b644}
+.obs-side-fields label[hidden]{display:none!important}
+.obs-side-hint{font-size:12px;color:#9eacbc;line-height:1.5;margin:15px 0}
+.obs-side-editor-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.obs-side-editor-actions .button{min-height:40px;font-size:12px}
+.obs-side-editor-actions #obsSideApply{min-width:126px}
+@media(max-width:460px){
+ .top .auth-area{max-width:52%}
+ .brand{font-size:12px}
+ .top .auth-button{font-size:10px}
+ .days .day{min-height:65px}
+ .card summary{padding:11px 12px;min-height:67px}
+ .obs-side-editor-overlay{padding:12px}
+ .obs-side-editor{padding:17px 14px;border-radius:17px;max-height:calc(100dvh - 28px - env(safe-area-inset-top) - env(safe-area-inset-bottom))}
+ .obs-side-fields{gap:6px}
+ .obs-side-fields label{font-size:11px}
+ .obs-side-fields input{font-size:16px;min-height:46px}
+ .obs-side-editor-actions{display:grid;grid-template-columns:1fr 1fr}
+ .obs-side-editor-actions #obsSideApply{grid-column:1/-1}
+}
+@media(prefers-reduced-motion:reduce){.day{transition:none}}
