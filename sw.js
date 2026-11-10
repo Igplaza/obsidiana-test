@@ -1,6 +1,6 @@
 /* Obsidiana iPhone beta: caché de interfaz, sin interceptar Supabase ni OAuth externo. */
-const CACHE = "obsidiana-ios-beta-20261108-balanced-sound-v314";
-const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./style.css", "./app.js", "./mobile-ui.js", "./progression.js", "./pdf-export.js", "./stats.js", "./sharing.js", "./auth-bundle.js", "./connected.js", "./linking.js", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png"];
+const CACHE = "obsidiana-ios-beta-20261110-premium-v400";
+const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./style.css", "./app.js", "./mobile-ui.js", "./progression.js", "./pdf-export.js", "./stats.js", "./sharing.js", "./auth-bundle.js", "./beta-access.js", "./connected.js", "./linking.js", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png"];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting()));
 });
